@@ -51,3 +51,31 @@ def test_steps_are_cited_values():
         assert isinstance(step, CitedValue)
         assert step.citation
         assert step.formula
+
+
+from fafsa.validate import VerificationResult, make_family, verify
+
+
+def test_verify_known_seed_is_verified():
+    family = make_family(0)
+    trace = prove_sai(family)
+    result = verify(trace)
+    assert isinstance(result, VerificationResult)
+    assert result.verified
+    assert "verified" in result.message
+
+
+def test_verify_novel_seed_is_unverified():
+    # seed 9999 is outside validated range (0–1014)
+    family = make_family(9999)
+    trace = prove_sai(family)
+    result = verify(trace)
+    assert not result.verified
+    assert "unverified" in result.message
+
+
+def test_verify_without_family_is_unverified():
+    from fafsa.kb import SAITrace, CitedValue
+    trace = SAITrace(sai=0, steps=[], family=None)
+    result = verify(trace)
+    assert not result.verified
