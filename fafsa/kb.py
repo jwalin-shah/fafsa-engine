@@ -1,5 +1,5 @@
 """
-exp80 — FAFSA SAI Knowledge Base (first real-world TL application)
+FAFSA SAI Knowledge Base — Formula A (Dependent Student)
 
 Architecture: hybrid.
   - Python arithmetic implements the EFC formula exactly
@@ -233,7 +233,7 @@ def prove_sai(family: DependentFamily) -> SAITrace:
 
     # --- Auto SAI = -1500 for non-filers per Max Pell Step 1 ---
     if family.max_pell_eligible:
-        return SAITrace(sai=-1500, steps=steps, auto_neg1500=True)
+        return SAITrace(sai=-1500, steps=steps, auto_neg1500=True, family=family)
 
     # =====================================================================
     # PARENT CONTRIBUTION FROM INCOME
@@ -516,83 +516,12 @@ def prove_sai(family: DependentFamily) -> SAITrace:
         "parent_contribution + student_income_contribution + student_asset_contribution (floor -1500)",
     )
 
-    result = SAITrace(sai=sai, steps=steps)
-    result.family = family
-    return result
+    return SAITrace(sai=sai, steps=steps, family=family)
 
 
 def prove_sai_counterfactual(family: DependentFamily, overrides: dict) -> SAITrace:
     """Re-run SAI with modified family facts (do() analogue)."""
     return prove_sai(dc_replace(family, **overrides))
-
-
-# ---------------------------------------------------------------------------
-# Synthetic test families
-# ---------------------------------------------------------------------------
-
-FAMILIES = {
-    "median_w2_two_parent": DependentFamily(
-        parent_agi=75_000,
-        parent_earned_income_p1=45_000,
-        parent_earned_income_p2=30_000,
-        parent_income_tax_paid=8_200,
-        parent_cash_savings=5_000,
-        parent_investment_net_worth=15_000,
-        older_parent_age=50,
-        family_size=4,         # 2 parents + student + sibling
-        num_parents=2,
-        student_agi=4_000,
-        student_earned_income=4_000,
-        student_cash_savings=1_000,
-    ),
-    "low_income_max_pell": DependentFamily(
-        # Non-filer parents → SAI = -1500
-        max_pell_eligible=True,
-    ),
-    "low_income_asset_exempt": DependentFamily(
-        # AGI < 60k + means-tested benefit → asset exempt
-        parent_agi=28_000,
-        parent_earned_income_p1=28_000,
-        parent_income_tax_paid=1_200,
-        older_parent_age=38,
-        family_size=3,
-        num_parents=1,
-    ),
-    "high_income_two_parent": DependentFamily(
-        parent_agi=200_000,
-        parent_earned_income_p1=120_000,
-        parent_earned_income_p2=80_000,
-        parent_income_tax_paid=42_000,
-        parent_cash_savings=25_000,
-        parent_investment_net_worth=325_000,
-        older_parent_age=52,
-        family_size=4,
-        num_parents=2,
-        student_agi=8_000,
-        student_earned_income=8_000,
-        student_cash_savings=5_000,
-        student_investment_net_worth=10_000,
-    ),
-    "single_parent_moderate": DependentFamily(
-        parent_agi=48_000,
-        parent_earned_income_p1=48_000,
-        parent_income_tax_paid=4_800,
-        parent_cash_savings=3_000,
-        older_parent_age=44,
-        family_size=3,
-        num_parents=1,
-    ),
-    "asset_rich_income_poor": DependentFamily(
-        parent_agi=35_000,
-        parent_earned_income_p1=35_000,
-        parent_income_tax_paid=2_500,
-        parent_cash_savings=10_000,
-        parent_investment_net_worth=110_000,  # inherited
-        older_parent_age=58,
-        family_size=3,
-        num_parents=2,
-    ),
-}
 
 
 # ---------------------------------------------------------------------------
