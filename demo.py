@@ -25,7 +25,7 @@ def run(query: str) -> None:
     print("\n[1/4] Extracting facts...")
     raw = backend.extract_facts(query)
     valid = {f.name for f in fields(DependentFamily)}
-    facts = {k: v for k, v in raw.items() if k in valid}
+    facts = {k: v for k, v in raw.items() if k in valid and v is not None}
     family = DependentFamily(**facts)
     if facts:
         for k, v in facts.items():

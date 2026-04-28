@@ -45,7 +45,7 @@ class OllamaBackend(LLMBackend):
         resp = requests.post(
             f"{OLLAMA_URL}/api/generate",
             json={"model": self.model, "prompt": prompt, "format": "json", "stream": False},
-            timeout=60,
+            timeout=120,
         )
         resp.raise_for_status()
         return json.loads(resp.json()["response"])
@@ -55,7 +55,7 @@ class OllamaBackend(LLMBackend):
         resp = requests.post(
             f"{OLLAMA_URL}/api/generate",
             json={"model": self.model, "prompt": prompt, "stream": False},
-            timeout=60,
+            timeout=120,
         )
         resp.raise_for_status()
         return resp.json()["response"].strip()
