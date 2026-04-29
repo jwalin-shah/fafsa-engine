@@ -65,10 +65,13 @@ Federal SAI guidelines are encoded as Python arithmetic with ED citations at eve
 | Backend | Command |
 |---|---|
 | Ollama (default) | `python demo.py "..."` |
+| MLX (Apple Silicon, no daemon) | `uv pip install -e ".[mlx]"; FAFSA_LLM=mlx python demo.py "..."` |
 | Claude | `FAFSA_LLM=claude python demo.py "..."` |
 | OpenAI | `FAFSA_LLM=openai python demo.py "..."` |
 
-Switch models: `FAFSA_LLM_MODEL=gemma4:4b python demo.py "..."`
+Switch models: `FAFSA_LLM_MODEL=mlx-community/Qwen2.5-1.5B-Instruct-4bit python demo.py "..."`
+
+The MLX backend runs the LM directly via Apple's `mlx_lm` — no separate daemon, no HTTP, uses unified GPU memory efficiently. Best choice for local dev on a Mac with constrained RAM.
 
 ## Beyond FAFSA
 

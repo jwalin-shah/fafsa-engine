@@ -16,6 +16,12 @@ class LLMBackend(ABC):
         ...
 
 
+_DEFAULT_MODEL = {
+    "ollama": "qwen3.5:4b",
+    "mlx": "mlx-community/Qwen3.5-2B-MLX-4bit",
+}
+
+
 def get_backend() -> LLMBackend:
     """Resolve backend from FAFSA_LLM env var (default: ollama)."""
     from llm.ollama_backend import OllamaBackend
@@ -23,7 +29,7 @@ def get_backend() -> LLMBackend:
     from llm.openai_backend import OpenAIBackend
 
     name = os.environ.get("FAFSA_LLM", "ollama").lower()
-    model = os.environ.get("FAFSA_LLM_MODEL", "qwen3.5:4b")
+    model = os.environ.get("FAFSA_LLM_MODEL") or _DEFAULT_MODEL.get(name, "qwen3.5:4b")
 
     if name == "ollama":
         return OllamaBackend(model=model)
@@ -31,4 +37,9 @@ def get_backend() -> LLMBackend:
         return ClaudeBackend()
     if name == "openai":
         return OpenAIBackend()
-    raise ValueError(f"Unknown FAFSA_LLM backend: {name!r}. Choose: ollama, claude, openai")
+    if name == "mlx":
+        from llm.mlx_backend import MLXBackend
+        return MLXBackend(model=model)
+    raise ValueError(
+        f"Unknown FAFSA_LLM backend: {name!r}. Choose: ollama, mlx, claude, openai"
+    )

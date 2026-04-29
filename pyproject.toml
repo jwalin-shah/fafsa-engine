@@ -10,6 +10,7 @@ dependencies = [
 [project.optional-dependencies]
 claude = ["anthropic"]
 openai = ["openai"]
+mlx = ["mlx-lm"]
 
 [build-system]
 requires = ["hatchling"]

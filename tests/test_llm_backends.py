@@ -119,3 +119,56 @@ def test_get_backend_unknown_raises():
     with patch.dict(os.environ, {"FAFSA_LLM": "unknown"}):
         with pytest.raises(ValueError, match="Unknown FAFSA_LLM backend"):
             get_backend()
+
+
+# ── MLXBackend ─────────────────────────────────────────────────────────────────
+
+def _patched_mlx_backend(generate_returns: str, model: str = "mlx-community/Qwen3.5-2B-MLX-4bit"):
+    """Build an MLXBackend whose model is mocked, so tests don't load real weights."""
+    from llm.mlx_backend import MLXBackend
+    fake_tok = MagicMock()
+    fake_tok.chat_template = None  # take the plain-prompt path
+    fake_tok.apply_chat_template = MagicMock(return_value="prompt")
+    fake_model = MagicMock()
+    with patch("llm.mlx_backend._load", return_value=(fake_model, fake_tok)):
+        with patch("llm.mlx_backend.generate", create=True, return_value=generate_returns):
+            with patch("mlx_lm.generate", return_value=generate_returns):
+                backend = MLXBackend(model=model)
+                backend._tokenizer = fake_tok
+                backend._model = fake_model
+                yield backend
+
+
+def test_mlx_extract_facts_parses_json_after_thinking():
+    """Qwen3 emits 'Thinking Process:' prose before JSON — backend must strip it."""
+    raw = (
+        "Thinking Process:\n"
+        "1. Parse the query.\n"
+        "2. Extract numeric values.\n\n"
+        '{"parent_agi": 80000, "family_size": 4, "num_parents": 2}'
+    )
+    from llm.mlx_backend import MLXBackend, _strip_thinking, _extract_json
+    parsed = _extract_json(_strip_thinking(raw))
+    assert parsed == {"parent_agi": 80000, "family_size": 4, "num_parents": 2}
+
+
+def test_mlx_strip_thinking_removes_think_tags():
+    from llm.mlx_backend import _strip_thinking
+    raw = "<think>internal reasoning ...</think>\n{\"x\": 1}"
+    assert _strip_thinking(raw).strip() == '{"x": 1}'
+
+
+def test_mlx_extract_json_raises_on_no_json():
+    from llm.mlx_backend import _extract_json
+    with pytest.raises(ValueError, match="No JSON object found"):
+        _extract_json("just prose, no braces here")
+
+
+def test_get_backend_mlx_default_model():
+    with patch.dict(os.environ, {"FAFSA_LLM": "mlx"}, clear=False):
+        with patch("llm.mlx_backend._load") as mock_load:
+            mock_load.return_value = (MagicMock(), MagicMock())
+            backend = get_backend()
+    from llm.mlx_backend import MLXBackend
+    assert isinstance(backend, MLXBackend)
+    assert backend.model_name == "mlx-community/Qwen3.5-2B-MLX-4bit"
