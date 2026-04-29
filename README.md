@@ -28,7 +28,9 @@ Query: My parents make $80k, family of 4
   contribution of around $8,000. Your SAI is 8,150.
 
 [4/4] Verifying...
-⚠️ unverified (novel input — engine result not cross-checked)
+✅ engine validated against 42/42 ED test ISIRs (parent contribution
+schedule, SAI summation, IPA table). This specific input was computed
+by the same engine but was not independently checked against ED.
 ```
 
 ## Quick start
@@ -48,9 +50,11 @@ Runs in under 30 seconds on CPU. No API key required.
 - **Facts extracted** — the LLM reads your query and pulls out income, family size, and other variables
 - **Proof tree** — the engine computes every step deterministically, with a citation to the ED formula
 - **Narration** — the LLM explains the result in plain English
-- **Verification tick** — the engine checks its answer against 1,015 pre-validated families
+- **Verification tick** — the engine's components are validated against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25): all 42 dependent-student records pass the parent contribution schedule, SAI summation, and IPA table checks
 
 The engine is the source of truth. The LLM is the language layer. Swap the model, the math doesn't change.
+
+> **What "verified" means here:** The engine has passed component-level validation against ED's published test data. That means the parent contribution schedule, SAI summation, and IPA table have all been independently checked. It does *not* mean every input you provide has been individually checked against ED — only that the engine producing the result has been validated on ED's own cases.
 
 ## How it works
 

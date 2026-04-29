@@ -1,9 +1,22 @@
+"""Verification of engine output.
+
+The engine's components (parent contribution schedule, SAI summation, IPA
+table) are validated at import time against the U.S. Department of
+Education's published 2024-25 test ISIRs. See ``fafsa/isir.py``.
+
+``verify(trace)`` reports whether the engine has been validated and how
+many ED test cases it agrees with. It does NOT claim that this specific
+input has been independently checked against ED — only that the engine
+producing the trace has passed component-level validation against ED's
+own test data.
+"""
 from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, asdict
 
 from fafsa.kb import DependentFamily, SAITrace, prove_sai
+from fafsa.isir import validate_isir_file, ISIRReport
 
 
 @dataclass
@@ -23,7 +36,12 @@ def _rand_int(lo: int, hi: int, zero_prob: float = 0.0) -> int:
 
 
 def make_family(seed: int | None = None) -> DependentFamily:
-    """Generate a reproducible random DependentFamily from a seed."""
+    """Generate a reproducible random DependentFamily from a seed.
+
+    Used for regression / smoke testing the engine's determinism. NOT a
+    correctness oracle — the families are random, the SAI is whatever
+    prove_sai() produces. Real correctness validation is in fafsa/isir.py.
+    """
     if seed is not None:
         random.seed(seed)
 
@@ -77,42 +95,56 @@ def make_family(seed: int | None = None) -> DependentFamily:
     )
 
 
-def _family_key(family: DependentFamily) -> tuple:
-    return tuple(sorted(asdict(family).items()))
+# ---------------------------------------------------------------------------
+# ED ground-truth validation (cached)
+# ---------------------------------------------------------------------------
+
+_ISIR_REPORT: ISIRReport | None = None
 
 
-_DATASET: dict[tuple, int] | None = None
-
-
-def _get_dataset() -> dict[tuple, int]:
-    global _DATASET
-    if _DATASET is None:
-        _DATASET = {}
-        for seed in range(1015):
-            family = make_family(seed)
-            trace = prove_sai(family)
-            _DATASET[_family_key(family)] = trace.sai
-    return _DATASET
+def _get_isir_report() -> ISIRReport:
+    """Run ISIR validation once per process and cache the result."""
+    global _ISIR_REPORT
+    if _ISIR_REPORT is None:
+        _ISIR_REPORT = validate_isir_file()
+    return _ISIR_REPORT
 
 
 def verify(trace: SAITrace) -> VerificationResult:
-    """Check trace against pre-validated 1015-family dataset."""
+    """Report engine validation status for a computed trace.
+
+    The engine's components are validated against ED's published 2024-25 test
+    ISIRs (see fafsa/isir.py). This function reports that validation status
+    alongside the trace's SAI value.
+
+    It does NOT claim that this specific input was independently verified
+    against ED — only that the engine producing the result has passed
+    component-level validation on ED's own test data.
+    """
     if trace.family is None:
         return VerificationResult(
             verified=False,
             message="⚠️ unverified (no input family stored in trace)",
         )
-    key = _family_key(trace.family)
-    dataset = _get_dataset()
-    if key in dataset:
-        expected = dataset[key]
-        if trace.sai == expected:
-            return VerificationResult(verified=True, message="✅ verified (matches validated dataset)")
+
+    report = _get_isir_report()
+
+    if report.failed > 0:
         return VerificationResult(
             verified=False,
-            message=f"❌ discrepancy: engine={trace.sai}, validated={expected}",
+            message=(
+                f"❌ engine FAILED ED validation: "
+                f"{report.passed}/{report.total} ED test ISIRs pass, "
+                f"{report.failed} fail. Engine output is not trustworthy."
+            ),
         )
+
     return VerificationResult(
-        verified=False,
-        message="⚠️ unverified (novel input — engine result not cross-checked)",
+        verified=True,
+        message=(
+            f"✅ engine validated against {report.passed}/{report.total} "
+            f"ED test ISIRs (parent contribution schedule, SAI summation, "
+            f"IPA table). This specific input was computed by the same engine "
+            f"but was not independently checked against ED."
+        ),
     )
