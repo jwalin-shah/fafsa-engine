@@ -18,17 +18,30 @@ class ClaudeBackend(LLMBackend):
         self.model = model
 
     def extract_facts(self, query: str) -> dict:
+        system_prompt = (
+            "You are a FAFSA financial expert. Your goal is to extract family facts for an SAI calculation.\n"
+            "For every field you extract, you MUST provide:\n"
+            "1. 'value': The numeric value (integer).\n"
+            "2. 'citation': The exact quote from the user's query.\n"
+            "3. 'reasoning': Why this value maps to this field.\n\n"
+            "If a value is not explicitly mentioned, do not include it. "
+            "Handle abbreviations like '80k' as 80000.\n"
+            f"Available fields: {_FIELDS_HINT}\n\n"
+            "Return a JSON object where each key is a field name and the value is an object with {value, citation, reasoning}."
+        )
         msg = self.client.messages.create(
             model=self.model,
-            max_tokens=512,
-            messages=[{"role": "user", "content": (
-                f"Extract FAFSA family financial data from the query below.\n"
-                f"Return JSON only. Include only fields you can determine. "
-                f"All monetary values are integers in dollars.\n\n"
-                f"Available fields: {_FIELDS_HINT}\n\nQuery: {query}\n\nJSON:"
-            )}],
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": f"Query: {query}\n\nJSON:"}],
         )
-        return json.loads(msg.content[0].text)
+        raw_extraction = json.loads(msg.content[0].text)
+        print("\n[Extraction Reasoning]")
+        for field, detail in raw_extraction.items():
+            if isinstance(detail, dict) and "value" in detail:
+                print(f"  - {field:30}: {detail['value']} (based on \"{detail.get('citation','')}\")")
+                print(f"    Reason: {detail.get('reasoning','')}")
+        return raw_extraction
 
     def narrate_proof(self, trace: SAITrace) -> str:
         formatted = fmt_trace(trace, verbose=True)

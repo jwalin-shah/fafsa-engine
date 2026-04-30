@@ -21,12 +21,18 @@ _FIELDS_HINT = (
 )
 
 _EXTRACT_PROMPT = """\
-Extract FAFSA family financial data from the query below.
-Return JSON only — no explanation, no markdown.
-Include only fields you can determine from the query.
-All monetary values are integers in dollars.
+You are a FAFSA financial expert. Your goal is to extract family facts for an SAI calculation.
+For every field you extract, you MUST provide:
+1. 'value': The numeric value (integer).
+2. 'citation': The exact quote from the user's query.
+3. 'reasoning': Why this value maps to this field.
+
+If a value is not explicitly mentioned, do not include it. 
+Handle abbreviations like '80k' as 80000.
 
 Available fields: {fields}
+
+Return a JSON object where each key is a field name and the value is an object with {{value, citation, reasoning}}.
 
 Query: {query}
 
@@ -104,8 +110,14 @@ class MLXBackend(LLMBackend):
 
     def extract_facts(self, query: str) -> dict:
         prompt = _EXTRACT_PROMPT.format(fields=_FIELDS_HINT, query=query)
-        raw = _generate(self._model, self._tokenizer, prompt, max_tokens=512)
-        return _extract_json(_strip_thinking(raw))
+        raw = _generate(self._model, self._tokenizer, prompt, max_tokens=1024)
+        raw_extraction = _extract_json(_strip_thinking(raw))
+        print("\n[Extraction Reasoning]")
+        for field, detail in raw_extraction.items():
+            if isinstance(detail, dict) and "value" in detail:
+                print(f"  - {field:30}: {detail['value']} (based on \"{detail.get('citation','')}\")")
+                print(f"    Reason: {detail.get('reasoning','')}")
+        return raw_extraction
 
     def narrate_proof(self, trace: SAITrace) -> str:
         prompt = _NARRATE_PROMPT.format(trace=fmt_trace(trace, verbose=True))

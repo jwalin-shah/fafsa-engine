@@ -24,14 +24,44 @@ def run(query: str) -> None:
     # 1. Extract facts from natural language
     print("\n[1/4] Extracting facts...")
     raw = backend.extract_facts(query)
-    valid = {f.name for f in fields(DependentFamily)}
-    facts = {k: v for k, v in raw.items() if k in valid and v is not None}
+    valid_fields = {f.name for f in fields(DependentFamily)}
+    
+    # Handle detailed reasoning dictionary structure
+    facts = {}
+    for k, v in raw.items():
+        if k in valid_fields and isinstance(v, dict) and "value" in v:
+            facts[k] = v["value"]
+        elif k in valid_fields and isinstance(v, (int, float)):
+            facts[k] = int(v)
+            
+    # --- DETERMINISTIC CONFIRMATION LOOP ---
+    while True:
+        print("\n[VERIFY EXTRACTED FACTS]")
+        if not facts:
+            print("  (no facts extracted)")
+        else:
+            for k, v in facts.items():
+                print(f"  {k:30}: {v:,}")
+        
+        confirm = input("\nAre these facts correct? [Y]es, [N]o, or type 'key=value' to fix: ").strip().lower()
+        if confirm == 'y' or not confirm:
+            break
+        elif '=' in confirm:
+            try:
+                k, v = confirm.split('=')
+                k = k.strip()
+                v = int(v.strip().replace(',', '').replace('$', ''))
+                if k in valid_fields:
+                    facts[k] = v
+                    print(f"  → Updated {k} to {v:,}")
+                else:
+                    print(f"  ❌ Unknown field: {k}")
+            except ValueError:
+                print("  ❌ Invalid format. Use 'field=12345'")
+        else:
+            print("\nTo fix a value, type e.g. 'parent_agi=90000'")
+
     family = DependentFamily(**facts)
-    if facts:
-        for k, v in facts.items():
-            print(f"  {k}: {v}")
-    else:
-        print("  (no facts extracted — using defaults)")
 
     # 2. Compute proof
     print("\n[2/4] Computing SAI proof...")
