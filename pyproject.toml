@@ -5,6 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "torch",
     "requests",
+    "tensor-logic @ file:../tensor-logic",
 ]
 
 [project.optional-dependencies]
@@ -13,8 +14,8 @@ openai = ["openai"]
 mlx = ["mlx-lm"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
+[tool.setuptools]
 packages = ["fafsa", "llm"]
