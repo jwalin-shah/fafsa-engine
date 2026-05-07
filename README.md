@@ -28,9 +28,8 @@ Query: My parents make $80k, family of 4
   contribution of around $8,000. Your SAI is 8,150.
 
 [4/4] Verifying...
-✅ engine validated against 42/42 ED test ISIRs (parent contribution
-schedule, SAI summation, IPA table). This specific input was computed
-by the same engine but was not independently checked against ED.
+❌ engine FAILED ED validation: 2/42 Formula A dependent ED records pass,
+40 fail, 0 skipped (103 file lines scanned). Engine output is not trustworthy.
 ```
 
 ## Quick start
@@ -50,11 +49,11 @@ Runs in under 30 seconds on CPU. No API key required.
 - **Facts extracted** — the LLM reads your query and pulls out income, family size, and other variables
 - **Proof tree** — the engine computes every step deterministically, with a citation to the ED formula
 - **Narration** — the LLM explains the result in plain English
-- **Verification tick** — the engine's components are validated against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25): all 42 dependent-student records pass the parent contribution schedule, SAI summation, and IPA table checks
+- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local gate is currently red: 2 of 42 Formula A dependent records pass, 40 fail, and 0 are skipped.
 
-The engine is the source of truth. The LLM is the language layer. Swap the model, the math doesn't change.
+The engine is the deterministic calculation layer. The LLM is the language layer. Because the current ED validation gate is red, treat computed results as experimental until the Formula A discrepancies are fixed.
 
-> **What "verified" means here:** The engine has passed component-level validation against ED's published test data. That means the parent contribution schedule, SAI summation, and IPA table have all been independently checked. It does *not* mean every input you provide has been individually checked against ED — only that the engine producing the result has been validated on ED's own cases.
+> **What "verified" means here:** `verify()` reports whether the local engine currently agrees with ED's published dependent-student test records. Today it returns unverified because the gate is red. When the gate is green, "verified" means component-level validation against ED's published test data; it still does *not* mean every input you provide has been individually checked against ED.
 
 ## How it works
 

@@ -1,14 +1,11 @@
 """Verification of engine output.
 
-The engine's components (parent contribution schedule, SAI summation, IPA
-table) are validated at import time against the U.S. Department of
-Education's published 2024-25 test ISIRs. See ``fafsa/isir.py``.
+The engine is checked against the U.S. Department of Education's published
+2024-25 test ISIRs when ``verify(trace)`` first runs. See ``fafsa/isir.py``.
 
-``verify(trace)`` reports whether the engine has been validated and how
-many ED test cases it agrees with. It does NOT claim that this specific
-input has been independently checked against ED — only that the engine
-producing the trace has passed component-level validation against ED's
-own test data.
+``verify(trace)`` reports the current local validation status and how many ED
+dependent records the engine agrees with. A failed local gate means the trace
+is unverified.
 """
 from __future__ import annotations
 import math
@@ -129,22 +126,26 @@ def verify(trace: SAITrace) -> VerificationResult:
 
     report = _get_isir_report()
 
-    if report.failed > 0:
+    if not report.all_passed:
         return VerificationResult(
             verified=False,
             message=(
                 f"❌ engine FAILED ED validation: "
-                f"{report.passed}/{report.total} ED test ISIRs pass, "
-                f"{report.failed} fail. Engine output is not trustworthy."
+                f"{report.passed}/{report.dependent_records} "
+                f"Formula A dependent ED records pass, "
+                f"{report.failed} fail, {report.skipped} skipped "
+                f"({report.total_file_lines} file lines scanned). "
+                f"Engine output is not trustworthy."
             ),
         )
 
     return VerificationResult(
         verified=True,
         message=(
-            f"✅ engine validated against {report.passed}/{report.total} "
-            f"ED test ISIRs (parent contribution schedule, SAI summation, "
-            f"IPA table). This specific input was computed by the same engine "
-            f"but was not independently checked against ED."
+            f"✅ engine validated against "
+            f"{report.passed}/{report.dependent_records} Formula A "
+            f"dependent ED records (parent contribution schedule, "
+            f"SAI summation, IPA table). This specific input was computed "
+            f"by the same engine but was not independently checked against ED."
         ),
     )

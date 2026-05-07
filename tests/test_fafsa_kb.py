@@ -56,26 +56,24 @@ def test_steps_are_cited_values():
 from fafsa.validate import VerificationResult, make_family, verify
 
 
-def test_verify_returns_verified_when_engine_passes_isir_validation():
-    """If the engine passes ED test ISIR validation, verify() reports ✅
-    for any trace it produced (and cites how many ED cases agreed)."""
+def test_verify_reports_unverified_when_isir_validation_is_red():
+    """When local ED test ISIR validation is red, verify() must say so."""
     family = make_family(0)
     trace = prove_sai(family)
     result = verify(trace)
     assert isinstance(result, VerificationResult)
-    assert result.verified
-    assert "ED test ISIRs" in result.message
-    assert "not independently checked" in result.message
+    assert not result.verified
+    assert "FAILED ED validation" in result.message
+    assert "not trustworthy" in result.message
 
 
-def test_verify_message_mentions_isir_count():
-    """Verify message must cite the number of ED ISIR cases validated."""
+def test_verify_message_mentions_current_isir_count():
+    """Verify message must cite the current ED ISIR validation count."""
     family = make_family(42)
     trace = prove_sai(family)
     result = verify(trace)
-    # The bundled ED file has 42 Formula A records. If the engine ever
-    # broke against any of them, this test would fail loudly.
-    assert "42/42" in result.message
+    assert "2/42" in result.message
+    assert "Formula A dependent ED records" in result.message
 
 
 def test_verify_without_family_is_unverified():
