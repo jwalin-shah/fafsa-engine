@@ -48,7 +48,8 @@ _FIELDS = {
 @dataclass
 class ISIRReport:
     """Result of running validation across an ISIR test file."""
-    total: int
+    total_file_lines: int
+    dependent_records: int
     passed: int
     failed: int
     skipped: int
@@ -56,7 +57,12 @@ class ISIRReport:
 
     @property
     def all_passed(self) -> bool:
-        return self.failed == 0 and self.passed > 0
+        return (
+            self.dependent_records > 0
+            and self.passed == self.dependent_records
+            and self.failed == 0
+            and self.skipped == 0
+        )
 
 
 def _pi(line: str, key: str) -> int:
@@ -133,19 +139,20 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
     with open(path) as f:
         lines = [l.rstrip("\n") for l in f]
 
-    passed = failed = skipped = 0
+    passed = failed = skipped = dependent_records = 0
     failures: list[dict] = []
 
     for lineno, line in enumerate(lines, 1):
         if not _is_dependent_record(line):
             continue
 
+        dependent_records += 1
         target_sai = _pi(line, "sai")
         
         # 1. Reconstruct inputs
         try:
             family = reconstruct_family(line)
-        except Exception as e:
+        except Exception:
             skipped += 1
             continue
             
@@ -167,4 +174,11 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
                 "fam": family.family_size,
             })
 
-    return ISIRReport(len(lines), passed, failed, skipped, failures)
+    return ISIRReport(
+        total_file_lines=len(lines),
+        dependent_records=dependent_records,
+        passed=passed,
+        failed=failed,
+        skipped=skipped,
+        failures=failures,
+    )
