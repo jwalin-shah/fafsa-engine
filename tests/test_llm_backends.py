@@ -97,9 +97,6 @@ def test_claude_narrate_proof_returns_str():
 # ── OpenAIBackend ──────────────────────────────────────────────────────────────
 
 def test_openai_extract_facts_parses_json():
-    pytest.importorskip("openai")
-    from llm.openai_backend import OpenAIBackend
-
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content='{"parent_agi": 80000, "family_size": 4}'))
@@ -111,9 +108,6 @@ def test_openai_extract_facts_parses_json():
 
 
 def test_openai_narrate_proof_returns_str():
-    pytest.importorskip("openai")
-    from llm.openai_backend import OpenAIBackend
-
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content="Your SAI is..."))

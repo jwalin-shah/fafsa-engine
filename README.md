@@ -1,6 +1,9 @@
 # fafsa-engine
 
-An LLM will tell you your SAI. This will prove it.
+An experimental FAFSA SAI proof engine with LLM-backed fact extraction.
+
+The current ED validation gate is red. Treat computed SAI values as
+experimental until the Formula A discrepancies below are fixed.
 
 ```
 $ python demo.py "My parents make $80k, family of 4"
@@ -44,6 +47,12 @@ python demo.py "My parents make $80k, family of 4"
 
 Runs in under 30 seconds on CPU. No API key required.
 
+The package metadata currently declares `tensor-logic @ file:../tensor-logic`.
+That sibling repo exists in the local tensor workspace, but this repo's runtime
+code does not import `tensor_logic` today. Fresh or isolated checkouts need the
+sibling path in place for editable installs, or the dependency strategy needs to
+be reconciled before this is portable.
+
 ## What you see
 
 - **Facts extracted** — the LLM reads your query and pulls out income, family size, and other variables
@@ -54,6 +63,41 @@ Runs in under 30 seconds on CPU. No API key required.
 The engine is the deterministic calculation layer. The LLM is the language layer. Because the current ED validation gate is red, treat computed results as experimental until the Formula A discrepancies are fixed.
 
 > **What "verified" means here:** `verify()` reports whether the local engine currently agrees with ED's published dependent-student test records. Today it returns unverified because the gate is red. When the gate is green, "verified" means component-level validation against ED's published test data; it still does *not* mean every input you provide has been individually checked against ED.
+
+## Current ED validation status
+
+Run:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
+```
+
+Current result: `15 passed`. These tests intentionally encode the red baseline
+so the public claim stays honest: `2/42` Formula A dependent ED records pass,
+`40/42` fail, and `0` are skipped.
+
+Failure taxonomy from the current gate:
+
+| Category | Count |
+|---|---:|
+| Engine SAI lower than ED target | 22 |
+| Engine SAI at `-1500` floor while ED target is higher | 11 |
+| Engine SAI higher than ED target | 7 |
+| Absolute delta within 1,000 | 11 |
+| Absolute delta from 1,001 to 10,000 | 25 |
+| Absolute delta from 10,001 to 50,000 | 4 |
+
+Intermediate-field drift is broad rather than a single dominant bug:
+
+| ISIR output field | Mismatching records |
+|---|---:|
+| Parent adjusted available income (`paai`) | 42/42 |
+| Parent contribution (`pc`) | 41/42 |
+| Student contribution from income (`sci`) | 10/42 |
+| Parent employment expense allowance (`eea`) | 7/42 |
+
+That spread points to formula and/or fixed-width reconstruction drift, so this
+slice does not claim ED validation is restored.
 
 ## How it works
 
@@ -74,17 +118,18 @@ The MLX backend runs the LM directly via Apple's `mlx_lm` — no separate daemon
 
 ## Beyond FAFSA
 
-Same engine, different rule file:
-- Medicaid eligibility (income thresholds, asset limits)
-- Tax compliance (bracket arithmetic, deduction rules)
-- Clinical guidelines (dosage calculations, contraindication checks)
-- Visa eligibility (income requirements, documentation rules)
-
-The proof pattern is domain-agnostic. FAFSA is the first instance.
+Future proof-engine domains should stay out of the product claim surface until
+the FAFSA ED gate is green or the new domain has its own scoped validation. This
+repo currently contains a small Medicaid demo module, not a validated Medicaid,
+tax, clinical, or visa product.
 
 ## Engine
 
-Rules live in `fafsa/kb.py`. Derivation substrate is `tensor_logic/`. See Domingos (2025) for the theoretical foundation.
+Rules live in `fafsa/kb.py`. The current derivation trace is Python arithmetic
+plus cited values. `tensor-logic` is a real sibling repo and a declared path
+dependency in `pyproject.toml`, but it is not imported by the current FAFSA
+runtime code; treat it as a dependency strategy to reconcile, not evidence that
+this checkout contains a `tensor_logic/` substrate.
 
 ## Disclaimer
 
