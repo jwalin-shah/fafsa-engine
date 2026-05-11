@@ -1,6 +1,5 @@
 from __future__ import annotations
 import json
-import anthropic
 from llm.base import LLMBackend
 from fafsa.kb import SAITrace, fmt_trace
 
@@ -14,7 +13,8 @@ _FIELDS_HINT = (
 
 class ClaudeBackend(LLMBackend):
     def __init__(self, model: str = "claude-haiku-4-5-20251001"):
-        self.client = anthropic.Anthropic()
+        from anthropic import Anthropic
+        self.client = Anthropic()
         self.model = model
 
     def extract_facts(self, query: str) -> dict:
