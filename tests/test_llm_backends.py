@@ -6,8 +6,6 @@ from unittest.mock import MagicMock, patch
 from fafsa.kb import DependentFamily, prove_sai
 from llm.base import get_backend
 from llm.ollama_backend import OllamaBackend
-from llm.claude_backend import ClaudeBackend
-from llm.openai_backend import OpenAIBackend
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -45,19 +43,25 @@ def test_ollama_custom_model():
 # ── ClaudeBackend ──────────────────────────────────────────────────────────────
 
 def test_claude_extract_facts_parses_json():
+    pytest.importorskip("anthropic")
+    from llm.claude_backend import ClaudeBackend
+
     mock_client = MagicMock()
     mock_client.messages.create.return_value.content = [
         MagicMock(text='{"parent_agi": 80000, "family_size": 4}')
     ]
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    with patch("llm.claude_backend.anthropic.Anthropic", return_value=mock_client):
         result = ClaudeBackend().extract_facts("My parents make $80k, family of 4")
     assert result == {"parent_agi": 80000, "family_size": 4}
 
 
 def test_claude_narrate_proof_returns_str():
+    pytest.importorskip("anthropic")
+    from llm.claude_backend import ClaudeBackend
+
     mock_client = MagicMock()
     mock_client.messages.create.return_value.content = [MagicMock(text="Your SAI is...")]
-    with patch("anthropic.Anthropic", return_value=mock_client):
+    with patch("llm.claude_backend.anthropic.Anthropic", return_value=mock_client):
         result = ClaudeBackend().narrate_proof(_make_trace())
     assert isinstance(result, str)
 
@@ -65,6 +69,9 @@ def test_claude_narrate_proof_returns_str():
 # ── OpenAIBackend ──────────────────────────────────────────────────────────────
 
 def test_openai_extract_facts_parses_json():
+    pytest.importorskip("openai")
+    from llm.openai_backend import OpenAIBackend
+
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content='{"parent_agi": 80000, "family_size": 4}'))
@@ -75,6 +82,9 @@ def test_openai_extract_facts_parses_json():
 
 
 def test_openai_narrate_proof_returns_str():
+    pytest.importorskip("openai")
+    from llm.openai_backend import OpenAIBackend
+
     mock_client = MagicMock()
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content="Your SAI is..."))
@@ -95,12 +105,19 @@ def test_get_backend_default_ollama():
 
 
 def test_get_backend_claude():
+    pytest.importorskip("anthropic")
+    from llm.claude_backend import ClaudeBackend
+
     with patch.dict(os.environ, {"FAFSA_LLM": "claude"}):
-        backend = get_backend()
+        with patch("llm.claude_backend.anthropic.Anthropic", return_value=MagicMock()):
+            backend = get_backend()
     assert isinstance(backend, ClaudeBackend)
 
 
 def test_get_backend_openai():
+    pytest.importorskip("openai")
+    from llm.openai_backend import OpenAIBackend
+
     mock_client = MagicMock()
     with patch.dict(os.environ, {"FAFSA_LLM": "openai"}):
         with patch("llm.openai_backend.OpenAI", return_value=mock_client):
