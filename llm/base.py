@@ -24,18 +24,17 @@ _DEFAULT_MODEL = {
 
 def get_backend() -> LLMBackend:
     """Resolve backend from FAFSA_LLM env var (default: ollama)."""
-    from llm.ollama_backend import OllamaBackend
-    from llm.claude_backend import ClaudeBackend
-    from llm.openai_backend import OpenAIBackend
-
     name = os.environ.get("FAFSA_LLM", "ollama").lower()
     model = os.environ.get("FAFSA_LLM_MODEL") or _DEFAULT_MODEL.get(name, "qwen3.5:4b")
 
     if name == "ollama":
+        from llm.ollama_backend import OllamaBackend
         return OllamaBackend(model=model)
     if name == "claude":
+        from llm.claude_backend import ClaudeBackend
         return ClaudeBackend()
     if name == "openai":
+        from llm.openai_backend import OpenAIBackend
         return OpenAIBackend()
     if name == "mlx":
         from llm.mlx_backend import MLXBackend

@@ -1,6 +1,5 @@
 from __future__ import annotations
 import json
-from openai import OpenAI
 from llm.base import LLMBackend
 from fafsa.kb import SAITrace, fmt_trace
 
@@ -14,6 +13,7 @@ _FIELDS_HINT = (
 
 class OpenAIBackend(LLMBackend):
     def __init__(self, model: str = "gpt-4o-mini"):
+        from openai import OpenAI
         self.client = OpenAI()
         self.model = model
 
