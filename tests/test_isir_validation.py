@@ -64,10 +64,12 @@ def test_failures_include_intermediate_diagnostics(report):
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
         "sai": 6,
+        "parent_available_income": 6,
         "parent_payroll_tax": 6,
         "paai": 6,
         "parent_total_allowances": 6,
         "pc": 6,
+        "parents_negative_paai_allowance": 1,
         "student_available_income": 1,
         "student_total_allowances": 1,
     }
@@ -81,6 +83,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
             "paai": 5,
+            "parent_available_income": 5,
             "parent_payroll_tax": 5,
             "parent_total_allowances": 5,
             "pc": 5,
@@ -89,8 +92,10 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
         "parent_fti": {
             "sai": 1,
             "paai": 1,
+            "parent_available_income": 1,
             "parent_payroll_tax": 1,
             "parent_total_allowances": 1,
+            "parents_negative_paai_allowance": 1,
             "pc": 1,
             "student_available_income": 1,
             "student_total_allowances": 1,
@@ -100,8 +105,8 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
 
 def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
-        "no_parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,sai": 5,
-        "parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
+        "no_parent_fti:parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,sai": 5,
+        "parent_fti:parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,parents_negative_paai_allowance,student_total_allowances,student_available_income,sai": 1,
     }
 
 
@@ -211,6 +216,24 @@ def test_parent_fti_filing_status_controls_payroll_jointness():
     assert trace.sai == _pi(line, "sai")
 
 
+def test_remaining_parent_fti_failure_exposes_negative_paai_allowance_drift(report):
+    failure = next(
+        failure
+        for failure in report.failures
+        if failure["parent_input_source"] == "parent_fti"
+    )
+    diagnostics = {item["field"]: item for item in failure["diagnostics"]}
+
+    assert failure["target"] == -921
+    assert diagnostics["parent_available_income"]["delta"] == -10732
+    assert diagnostics["parents_negative_paai_allowance"]["expected"] == 0
+    assert diagnostics["parents_negative_paai_allowance"]["actual"] == 8100
+    assert (
+        diagnostics["student_total_allowances"]["delta"]
+        == diagnostics["parents_negative_paai_allowance"]["delta"]
+    )
+
+
 def test_student_reconstruction_uses_corrected_isir_offsets():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
@@ -298,6 +321,7 @@ def test_no_parent_fti_failures_are_isolated_to_parent_payroll_proxy_in_diagnost
         assert set(diagnostics) == {
             "parent_payroll_tax",
             "parent_total_allowances",
+            "parent_available_income",
             "paai",
             "pc",
             "sai",
@@ -308,6 +332,10 @@ def test_no_parent_fti_failures_are_isolated_to_parent_payroll_proxy_in_diagnost
         )
         assert (
             diagnostics["paai"]["delta"]
+            == -diagnostics["parent_payroll_tax"]["delta"]
+        )
+        assert (
+            diagnostics["parent_available_income"]["delta"]
             == -diagnostics["parent_payroll_tax"]["delta"]
         )
         assert failure["parent_wage_proxy_source"] == "parent_total_income_proxy"
@@ -325,8 +353,10 @@ def test_intermediate_comparison_names_expected_isir_fields():
         "eea",
         "parent_payroll_tax",
         "parent_total_allowances",
+        "parent_available_income",
         "paai",
         "pc",
+        "parents_negative_paai_allowance",
         "student_total_income",
         "student_total_allowances",
         "student_available_income",

@@ -484,3 +484,69 @@ Residual risk:
   still use generated parent total income as the wage proxy, and the remaining
   parent-FTI failure has parent payroll/allowance drift plus downstream student
   allowance drift.
+
+## FAFSA-N Formula A Remaining Failure Diagnostics - 2026-05-13
+
+Branch: `codex/fafsa-remaining-failure-diagnostics`
+
+Scope: one diagnostic-only slice against the remaining six Formula A failures.
+
+Diagnosis:
+
+- Baseline after `#24` remains red at `36/42` Formula A records passing and
+  `6/42` failing.
+- Five no-parent-FTI records still fail through the generated parent total
+  income wage proxy.
+- The single remaining parent-FTI record has parent payroll/allowance drift
+  that makes PAAI negative in the engine, which then creates a downstream
+  parents-negative-PAAI allowance mismatch on the student side.
+
+Change:
+
+- `fafsa/isir.py` now maps the ED parent available income output field.
+- `fafsa/isir.py` now maps the ED parents negative PAAI allowance output field.
+- `tests/test_isir_validation.py` asserts that the remaining parent-FTI
+  failure exposes the parent available income and parents-negative-PAAI
+  propagation instead of hiding it behind total allowance fields.
+- `README.md` updates the current red-baseline failure signatures.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result: passed, `23 passed`.
+
+```bash
+python3 -m pytest -q
+```
+
+Result: passed, `53 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
+Explicit gate check:
+
+```bash
+python3 - <<'PY'
+from fafsa.isir import validate_isir_file
+report = validate_isir_file('data/IDSA25OP-20240308.txt')
+print(f'Formula A gate: {report.passed}/{report.dependent_records} passed, {report.failed} failed, {report.skipped} skipped, all_passed={report.all_passed}')
+print('diagnostic_summary=', report.diagnostic_summary)
+print('failure_signature_summary=', report.failure_signature_summary)
+PY
+```
+
+Result: `36/42` passed, `6` failed, `0` skipped, `all_passed=False`.
+
+Residual risk:
+
+- This does not change Formula A outputs. It narrows the next correctness work
+  but still leaves product correctness blocked.
+- No-parent-FTI payroll should still not be fixed by back-solving ED generated
+  payroll outputs.
