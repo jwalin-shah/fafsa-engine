@@ -46,6 +46,7 @@ _FIELDS = {
     "s_tax_fti": (7126, 7135),
     
     # Parent Section
+    "p_filing_status_fti": (7326, 7327),
     "p_agi_fti": (7327, 7337),
     "p_num_exemptions_fti": (7337, 7339),
     "p_num_dependents_fti": (7339, 7341),
@@ -124,6 +125,7 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_agi = _pi(line, "p_agi_fti")
     p_tax = _pi(line, "p_tax_fti")
     p_ira = _pi(line, "p_ira_fti")
+    p_filing_status = _pi(line, "p_filing_status_fti")
     p_earned_income = _pi(line, "p_earned_fti")
     p_spouse_earned_income = _pi(line, "p_spouse_earned_fti")
     p_spouse_tax = _pi(line, "p_spouse_tax_fti")
@@ -235,6 +237,7 @@ def reconstruct_family(line: str) -> DependentFamily:
         parent_child_support_received=p_child_support,
         family_size=family_size,
         num_parents=num_parents,
+        parent_filing_status=p_filing_status,
         student_agi=s_agi,
         student_foreign_income_exclusion=s_foreign_income_exclusion,
         student_taxable_scholarships=s_taxable_scholarships,
