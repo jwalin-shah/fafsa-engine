@@ -1,0 +1,49 @@
+{
+  "schema": "architecture-findings.v1",
+  "repo": "fafsa-engine",
+  "generated_at": "2026-05-12",
+  "notes": [
+    "Read README.md, llm-tldr tree output, and sampled fafsa modules/tests.",
+    "No repo-local AGENTS.md, CLAUDE.md, CONTEXT.md, or docs/adr directory was present.",
+    "Pre-existing blocker: git status showed M .gitignore."
+  ],
+  "candidate_count": 3,
+  "candidates": [
+    {
+      "id": "formula-engine",
+      "title": "Split formula tables, calculations, and trace construction behind a Formula Engine Module",
+      "files": ["fafsa/kb.py", "tests/test_fafsa_kb.py", "fafsa/validate.py"],
+      "problem": "The SAI Module combines input dataclasses, ED tables, helper formulas, dependent/independent calculations, citations, and trace construction. The Interface is broad, and each formula change requires reading the whole Implementation.",
+      "solution": "Create a Formula Engine seam: immutable formula inputs in, structured trace out. Move ED tables and line calculations into named Modules that the engine composes.",
+      "benefits": "Locality improves for ED-line defects, and Leverage improves because callers keep using prove_sai while the Implementation gains clearer formula seams.",
+      "test_impact": "Tests can target line-level formula Modules plus end-to-end SAI traces.",
+      "risk": "Moderate because the README reports the ED validation gate is currently red.",
+      "suggested_validation": "python -m pytest tests/test_fafsa_kb.py tests/test_isir_validation.py -v",
+      "adr_conflict": null
+    },
+    {
+      "id": "isir-reconstruction",
+      "title": "Deepen ISIR reconstruction as a validation adapter",
+      "files": ["fafsa/isir.py", "fafsa/validate.py", "tests/test_isir_validation.py"],
+      "problem": "Fixed-width field extraction, missing-value handling, family reconstruction heuristics, and validation reporting live together. This makes the validation Adapter shallow and hard to debug when ED records fail.",
+      "solution": "Separate ISIR parsing, family reconstruction, and comparison reporting Modules. Keep validate_isir_file as the public Adapter.",
+      "benefits": "Locality improves for the red validation gate because parsing errors, reconstruction assumptions, and formula mismatches become distinguishable.",
+      "test_impact": "Add focused tests for fixed-width parsing and reconstruction before SAI comparison.",
+      "risk": "Low to moderate; the current red baseline must be preserved until correctness fixes are intentional.",
+      "suggested_validation": "python -m pytest tests/test_isir_validation.py -v",
+      "adr_conflict": null
+    },
+    {
+      "id": "presentation-layer",
+      "title": "Move fact intake and narration behind narrow adapters",
+      "files": ["demo.py", "app.py", "fafsa/wizard.py", "llm/base.py", "llm/ollama_backend.py", "llm/openai_backend.py", "llm/claude_backend.py", "llm/mlx_backend.py"],
+      "problem": "CLI, web app, wizard, and LLM backends each know details about family facts and trace presentation. That spreads user-facing behavior across several shallow Modules.",
+      "solution": "Introduce a fact-intake Adapter Interface and a trace-presentation Adapter Interface. Keep the deterministic engine separate from extraction and narration.",
+      "benefits": "Locality improves for UX changes and LLM backend changes. Leverage improves because all frontends can reuse the same fact schema and trace view.",
+      "test_impact": "Backend tests can stay mocked while fact normalization and presentation get deterministic tests.",
+      "risk": "Low; this can be introduced without changing engine math.",
+      "suggested_validation": "python -m pytest tests/test_llm_backends.py tests/test_fafsa_kb.py -v",
+      "adr_conflict": null
+    }
+  ]
+}

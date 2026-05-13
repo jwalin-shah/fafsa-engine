@@ -11,10 +11,17 @@ _FIELDS_HINT = (
 )
 
 
-class OpenAIBackend(LLMBackend):
-    def __init__(self, model: str = "gpt-4o-mini"):
+def _create_openai_client():
+    try:
         from openai import OpenAI
-        self.client = OpenAI()
+    except ImportError as exc:
+        raise RuntimeError("Install fafsa-engine[openai] to use OpenAIBackend.") from exc
+    return OpenAI()
+
+
+class OpenAIBackend(LLMBackend):
+    def __init__(self, model: str = "gpt-4o-mini", client=None):
+        self.client = client or _create_openai_client()
         self.model = model
 
     def extract_facts(self, query: str) -> dict:

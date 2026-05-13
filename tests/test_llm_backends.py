@@ -5,7 +5,6 @@ import os
 import sys
 import pytest
 from pathlib import Path
-from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 from fafsa.kb import DependentFamily, prove_sai
@@ -19,13 +18,6 @@ from llm.openai_backend import OpenAIBackend
 
 def _make_trace():
     return prove_sai(DependentFamily(parent_agi=80_000, family_size=4))
-
-
-def _fake_module(name: str, **attrs):
-    module = ModuleType(name)
-    for attr_name, attr_value in attrs.items():
-        setattr(module, attr_name, attr_value)
-    return module
 
 
 def _block_optional_sdk_imports(monkeypatch):
@@ -79,8 +71,7 @@ def test_claude_extract_facts_parses_json():
     mock_client.messages.create.return_value.content = [
         MagicMock(text='{"parent_agi": 80000, "family_size": 4}')
     ]
-    fake_anthropic = _fake_module("anthropic", Anthropic=MagicMock(return_value=mock_client))
-    with patch.dict(sys.modules, {"anthropic": fake_anthropic}):
+    with patch("llm.claude_backend._create_anthropic_client", return_value=mock_client):
         result = ClaudeBackend().extract_facts("My parents make $80k, family of 4")
     assert result == {"parent_agi": 80000, "family_size": 4}
 
@@ -88,8 +79,7 @@ def test_claude_extract_facts_parses_json():
 def test_claude_narrate_proof_returns_str():
     mock_client = MagicMock()
     mock_client.messages.create.return_value.content = [MagicMock(text="Your SAI is...")]
-    fake_anthropic = _fake_module("anthropic", Anthropic=MagicMock(return_value=mock_client))
-    with patch.dict(sys.modules, {"anthropic": fake_anthropic}):
+    with patch("llm.claude_backend._create_anthropic_client", return_value=mock_client):
         result = ClaudeBackend().narrate_proof(_make_trace())
     assert isinstance(result, str)
 
@@ -101,8 +91,7 @@ def test_openai_extract_facts_parses_json():
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content='{"parent_agi": 80000, "family_size": 4}'))
     ]
-    fake_openai = _fake_module("openai", OpenAI=MagicMock(return_value=mock_client))
-    with patch.dict(sys.modules, {"openai": fake_openai}):
+    with patch("llm.openai_backend._create_openai_client", return_value=mock_client):
         result = OpenAIBackend().extract_facts("My parents make $80k, family of 4")
     assert result == {"parent_agi": 80000, "family_size": 4}
 
@@ -112,8 +101,7 @@ def test_openai_narrate_proof_returns_str():
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=MagicMock(content="Your SAI is..."))
     ]
-    fake_openai = _fake_module("openai", OpenAI=MagicMock(return_value=mock_client))
-    with patch.dict(sys.modules, {"openai": fake_openai}):
+    with patch("llm.openai_backend._create_openai_client", return_value=mock_client):
         result = OpenAIBackend().narrate_proof(_make_trace())
     assert isinstance(result, str)
 
@@ -148,18 +136,16 @@ def test_get_backend_default_ollama_without_optional_sdks(monkeypatch):
 
 
 def test_get_backend_claude():
-    fake_anthropic = _fake_module("anthropic", Anthropic=MagicMock(return_value=MagicMock()))
     with patch.dict(os.environ, {"FAFSA_LLM": "claude"}):
-        with patch.dict(sys.modules, {"anthropic": fake_anthropic}):
+        with patch("llm.claude_backend._create_anthropic_client", return_value=MagicMock()):
             backend = get_backend()
     assert isinstance(backend, ClaudeBackend)
 
 
 def test_get_backend_openai():
     mock_client = MagicMock()
-    fake_openai = _fake_module("openai", OpenAI=MagicMock(return_value=mock_client))
     with patch.dict(os.environ, {"FAFSA_LLM": "openai"}):
-        with patch.dict(sys.modules, {"openai": fake_openai}):
+        with patch("llm.openai_backend._create_openai_client", return_value=mock_client):
             backend = get_backend()
     assert isinstance(backend, OpenAIBackend)
 
