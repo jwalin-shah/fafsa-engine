@@ -68,7 +68,6 @@ def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
         "pc": 40,
         "sai": 40,
         "sci": 10,
-        "eea": 7,
     }
 
 
@@ -78,7 +77,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
         "parent_fti": {"total": 35, "passed": 2, "failed": 33, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
-        "no_parent_fti": {"eea": 7, "paai": 7, "pc": 7, "sai": 7, "sci": 1},
+        "no_parent_fti": {"paai": 7, "pc": 7, "sai": 7, "sci": 1},
         "parent_fti": {"paai": 33, "pc": 33, "sai": 33, "sci": 9},
     }
 
@@ -87,9 +86,24 @@ def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
         "parent_fti:paai,pc,sai": 24,
         "parent_fti:paai,pc,sci,sai": 9,
-        "no_parent_fti:eea,paai,pc,sai": 6,
-        "no_parent_fti:eea,paai,pc,sci,sai": 1,
+        "no_parent_fti:paai,pc,sai": 6,
+        "no_parent_fti:paai,pc,sci,sai": 1,
     }
+
+
+def test_no_parent_fti_reconstruction_uses_generated_parent_total_income(report):
+    no_parent_fti_failures = [
+        failure
+        for failure in report.failures
+        if failure["parent_input_source"] == "no_parent_fti"
+    ]
+
+    assert no_parent_fti_failures
+    assert all(failure["p_agi"] > 0 for failure in no_parent_fti_failures)
+    assert all(
+        "eea" not in {item["field"] for item in failure["diagnostics"]}
+        for failure in no_parent_fti_failures
+    )
 
 
 def test_intermediate_comparison_names_expected_isir_fields():

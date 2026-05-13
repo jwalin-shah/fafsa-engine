@@ -26,6 +26,9 @@ _FIELDS = {
     "sci":     (3060, 3075),
     "sca":     (3162, 3174),
     "fam":     (3177, 3180), # Assumed family size
+    "parent_total_allowances": (2865, 2880),
+    "parent_payroll_tax":      (2880, 2895),
+    "parent_total_income":     (7624, 7639),
     
     # Input fields (for reconstruction)
     # Student Section
@@ -95,6 +98,20 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_agi = _pi(line, "p_agi_fti")
     p_tax = _pi(line, "p_tax_fti")
     p_ira = _pi(line, "p_ira_fti")
+
+    if p_agi == 0 and p_tax == 0 and p_ira == 0:
+        p_total_income = _pi(line, "parent_total_income")
+        if p_total_income:
+            p_agi = p_total_income
+            parent_total_allowances = _pi(line, "parent_total_allowances")
+            if parent_total_allowances:
+                p_tax = max(
+                    0,
+                    parent_total_allowances
+                    - _pi(line, "parent_payroll_tax")
+                    - _pi(line, "ipa")
+                    - _pi(line, "eea"),
+                )
     
     # Family structure
     family_size = _pi(line, "p_fam_fti")
