@@ -93,9 +93,11 @@ Aggregate mismatches across the 6 failing Formula A records are:
 |---|---:|
 | Student Aid Index (`sai`) | 6/6 |
 | Parent payroll tax | 6/6 |
-| Parent adjusted available income (`paai`) | 6/6 |
 | Parent total allowances | 6/6 |
+| Parent available income | 6/6 |
+| Parent adjusted available income (`paai`) | 6/6 |
 | Parent contribution (`pc`) | 6/6 |
+| Parents negative PAAI allowance | 1/6 |
 | Student available income | 1/6 |
 | Student total allowances | 1/6 |
 
@@ -120,26 +122,27 @@ the parent 1 FTI AGI field is blank, the parser no longer backfills parent 1
 wages from generated parent total income. That clears one parent-FTI payroll
 allowance mismatch without using ED output values as an oracle. The remaining
 no-parent-FTI failure signature is
-`parent_payroll_tax,parent_total_allowances,paai,pc,sai` for five records. In
-the current diagnostics model, the parent total allowance delta equals the
-parent payroll tax delta, which isolates the visible residual to the
-generated-total-income wage proxy.
+`parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,sai`
+for five records. In the current diagnostics model, the parent total allowance
+and parent available income deltas are driven by parent payroll tax, which
+isolates the visible residual to the generated-total-income wage proxy.
 Negative half-dollar values now round away from zero, matching the ED test ISIR
 record with student contribution from income `-1175` and moving the red gate to
 35/42. Parent FTIM filing status now controls payroll jointness when present,
 clearing one parent-FTI payroll-tax mismatch and moving the red gate to 36/42.
 The remaining parent-FTI failure is
-`parent_payroll_tax,parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai`,
+`parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,parents_negative_paai_allowance,student_total_allowances,student_available_income,sai`,
 one record.
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
 field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
-parent payroll tax, parent total allowances, `paai`, `pc`, student total
-allowances, student available income, `sci`, `sca`, and `sai`), the parent input
-source, and aggregate summaries by source and failure signature. The next
-correction slice can target the five no-parent-FTI reconstruction records
-separately from the remaining parent FTI record.
+parent payroll tax, parent total allowances, parent available income, `paai`,
+`pc`, parents negative PAAI allowance, student total allowances, student
+available income, `sci`, `sca`, and `sai`), the parent input source, and
+aggregate summaries by source and failure signature. The next correction slice
+can target the five no-parent-FTI reconstruction records separately from the
+remaining parent FTI record.
 
 ## How it works
 
