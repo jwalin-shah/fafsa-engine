@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from fafsa.isir import ISIRReport, compare_isir_intermediates, reconstruct_family, validate_isir_file
+from fafsa.isir import ISIRReport, _pi, compare_isir_intermediates, reconstruct_family, validate_isir_file
 from fafsa.kb import prove_sai
 
 
@@ -31,8 +31,8 @@ def test_isir_file_has_dependent_records(report):
 
 
 def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 2
-    assert report.failed == 40
+    assert report.passed == 3
+    assert report.failed == 39
     assert report.skipped == 0
     assert report.failures, "Expected current engine to disagree with ED records"
 
@@ -64,20 +64,20 @@ def test_failures_include_intermediate_diagnostics(report):
 
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
-        "paai": 40,
-        "pc": 40,
-        "sai": 40,
+        "paai": 39,
+        "pc": 39,
+        "sai": 39,
         "sci": 10,
     }
 
 
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
-        "no_parent_fti": {"total": 7, "passed": 0, "failed": 7, "skipped": 0},
+        "no_parent_fti": {"total": 7, "passed": 1, "failed": 6, "skipped": 0},
         "parent_fti": {"total": 35, "passed": 2, "failed": 33, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
-        "no_parent_fti": {"paai": 7, "pc": 7, "sai": 7, "sci": 1},
+        "no_parent_fti": {"paai": 6, "pc": 6, "sai": 6, "sci": 1},
         "parent_fti": {"paai": 33, "pc": 33, "sai": 33, "sci": 9},
     }
 
@@ -86,9 +86,21 @@ def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
         "parent_fti:paai,pc,sai": 24,
         "parent_fti:paai,pc,sci,sai": 9,
-        "no_parent_fti:paai,pc,sai": 6,
+        "no_parent_fti:paai,pc,sai": 5,
         "no_parent_fti:paai,pc,sci,sai": 1,
     }
+
+
+def test_parent_asset_reconstruction_uses_isir_layout_positions():
+    line = ISIR_FILE.read_text().splitlines()[87]
+    family = reconstruct_family(line)
+    trace = prove_sai(family)
+
+    assert family.parent_cash_savings == 2500
+    assert family.parent_investment_net_worth == 0
+    assert family.parent_business_farm_net_worth == 0
+    assert trace.sai == 1702
+    assert trace.sai == _pi(line, "sai")
 
 
 def test_no_parent_fti_reconstruction_uses_generated_parent_total_income(report):

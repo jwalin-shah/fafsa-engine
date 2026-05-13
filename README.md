@@ -31,8 +31,8 @@ Query: My parents make $80k, family of 4
   contribution of around $8,000. Your SAI is 8,150.
 
 [4/4] Verifying...
-❌ engine FAILED ED validation: 2/42 Formula A dependent ED records pass,
-40 fail, 0 skipped (103 file lines scanned). Engine output is not trustworthy.
+❌ engine FAILED ED validation: 3/42 Formula A dependent ED records pass,
+39 fail, 0 skipped (103 file lines scanned). Engine output is not trustworthy.
 ```
 
 ## Quick start
@@ -58,7 +58,7 @@ be reconciled before this is portable.
 - **Facts extracted** — the LLM reads your query and pulls out income, family size, and other variables
 - **Proof tree** — the engine computes every step deterministically, with a citation to the ED formula
 - **Narration** — the LLM explains the result in plain English
-- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local gate is currently red: 2 of 42 Formula A dependent records pass, 40 fail, and 0 are skipped.
+- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local gate is currently red: 3 of 42 Formula A dependent records pass, 39 fail, and 0 are skipped.
 
 The engine is the deterministic calculation layer. The LLM is the language layer. Because the current ED validation gate is red, treat computed results as experimental until the Formula A discrepancies are fixed.
 
@@ -72,41 +72,43 @@ Run:
 python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
 ```
 
-Current result: `21 passed`. These tests intentionally encode the red baseline
-so the public claim stays honest: `2/42` Formula A dependent ED records pass,
-`40/42` fail, and `0` are skipped.
+Current result: `22 passed`. These tests intentionally encode the red baseline
+so the public claim stays honest: `3/42` Formula A dependent ED records pass,
+`39/42` fail, and `0` are skipped.
 
 Failure taxonomy from the current gate:
 
 | Category | Count |
 |---|---:|
-| Engine SAI lower than ED target | 22 |
-| Engine SAI at `-1500` floor while ED target is higher | 11 |
-| Engine SAI higher than ED target | 7 |
-| Absolute delta within 1,000 | 11 |
-| Absolute delta from 1,001 to 10,000 | 25 |
-| Absolute delta from 10,001 to 50,000 | 4 |
+| Engine SAI lower than ED target | 21 |
+| Engine SAI at `-1500` floor while ED target is higher | 4 |
+| Engine SAI higher than ED target | 14 |
+| Absolute delta within 1,000 | 20 |
+| Absolute delta from 1,001 to 10,000 | 18 |
+| Absolute delta from 10,001 to 50,000 | 1 |
 
-Aggregate mismatches across the 40 failing Formula A records are:
+Aggregate mismatches across the 39 failing Formula A records are:
 
 | ISIR output field | Mismatching records |
 |---|---:|
-| Parent adjusted available income (`paai`) | 40/40 |
-| Parent contribution (`pc`) | 40/40 |
-| Student Aid Index (`sai`) | 40/40 |
-| Student contribution from income (`sci`) | 10/40 |
+| Parent adjusted available income (`paai`) | 39/39 |
+| Parent contribution (`pc`) | 39/39 |
+| Student Aid Index (`sai`) | 39/39 |
+| Student contribution from income (`sci`) | 10/39 |
 
 The current red baseline now separates records by parent input source:
 
 | Parent input source | Total | Passed | Failed |
 |---|---:|---:|---:|
 | Parent FTI fields parsed | 35 | 2 | 33 |
-| No parent FTI fields parsed | 7 | 0 | 7 |
+| No parent FTI fields parsed | 7 | 1 | 6 |
 
 The seven records without parsed parent FTI values are now reconstructed from
 the ED-published generated parent total income and total allowance fields, which
-clears the prior `eea` mismatch cluster. Their remaining failure signatures are
-`paai,pc,sai` for six records and `paai,pc,sci,sai` for one record. The
+clears the prior `eea` mismatch cluster. Parent manually entered asset fields
+are parsed from the ED record-layout positions 1946-1966, clearing one
+additional no-parent-FTI record. The remaining no-parent-FTI failure signatures
+are `paai,pc,sai` for five records and `paai,pc,sci,sai` for one record. The
 remaining 33 failing records have parsed parent FTI values; 24 fail on
 `paai,pc,sai`, and 9 also fail on `sci`.
 
