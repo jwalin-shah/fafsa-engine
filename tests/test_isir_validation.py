@@ -66,6 +66,7 @@ def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
         "sai": 14,
         "paai": 11,
+        "parent_total_allowances": 11,
         "pc": 11,
         "sci": 4,
         "student_available_income": 4,
@@ -81,6 +82,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
             "paai": 6,
+            "parent_total_allowances": 6,
             "pc": 6,
             "sai": 6,
             "sci": 1,
@@ -90,6 +92,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
         "parent_fti": {
             "sai": 8,
             "paai": 5,
+            "parent_total_allowances": 5,
             "pc": 5,
             "sci": 3,
             "student_available_income": 3,
@@ -100,10 +103,10 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
 
 def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
-        "no_parent_fti:paai,pc,sai": 5,
-        "parent_fti:paai,pc,sai": 5,
+        "no_parent_fti:parent_total_allowances,paai,pc,sai": 5,
+        "parent_fti:parent_total_allowances,paai,pc,sai": 5,
         "parent_fti:student_total_allowances,student_available_income,sci,sai": 3,
-        "no_parent_fti:paai,pc,student_total_allowances,student_available_income,sci,sai": 1,
+        "no_parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sci,sai": 1,
     }
 
 
@@ -171,7 +174,19 @@ def test_intermediate_comparison_names_expected_isir_fields():
     diagnostics = compare_isir_intermediates(line, trace)
 
     assert diagnostics
-    assert {item["field"] for item in diagnostics} <= {"ipa", "eea", "paai", "pc", "sci", "sca", "sai"}
+    assert {item["field"] for item in diagnostics} <= {
+        "ipa",
+        "eea",
+        "parent_total_allowances",
+        "paai",
+        "pc",
+        "student_total_income",
+        "student_total_allowances",
+        "student_available_income",
+        "sci",
+        "sca",
+        "sai",
+    }
     assert all({"field", "trace_label", "expected", "actual", "delta"} <= set(item) for item in diagnostics)
 
 
