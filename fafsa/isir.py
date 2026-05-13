@@ -26,15 +26,18 @@ _FIELDS = {
     "sci":     (3060, 3075),
     "sca":     (3162, 3174),
     "fam":     (3177, 3180), # Assumed family size
+    "student_total_allowances": (3030, 3045),
+    "student_available_income": (3045, 3060),
+    "student_total_income": (7609, 7624),
     "parent_total_allowances": (2865, 2880),
     "parent_payroll_tax":      (2880, 2895),
     "parent_total_income":     (7624, 7639),
     
     # Input fields (for reconstruction)
     # Student Section
-    "s_agi":    (709, 720),
-    "s_wages":  (776, 787), 
-    "s_tax":    (731, 742), 
+    "s_wages":  (710, 721),
+    "s_agi":    (776, 786),
+    "s_tax":    (786, 795),
     
     # Parent Section
     "p_agi_fti": (7341, 7352),
@@ -77,6 +80,9 @@ _TRACE_TO_ISIR_FIELDS = {
     "parent_employment_expense_allowance": "eea",
     "parent_adjusted_available_income": "paai",
     "parent_contribution": "pc",
+    "student_total_income": "student_total_income",
+    "student_total_allowances": "student_total_allowances",
+    "student_available_income": "student_available_income",
     "student_contribution_from_income": "sci",
     "student_contribution_from_assets": "sca",
     "student_aid_index": "sai",
@@ -91,6 +97,12 @@ def _pi(line: str, key: str) -> int:
         return int(v[0])
     except ValueError:
         return 0
+
+
+def _has_value(line: str, key: str) -> bool:
+    s, e = _FIELDS[key]
+    v = line[s:e].strip().split()
+    return bool(v and v[0] != "N/A")
 
 
 def reconstruct_family(line: str) -> DependentFamily:
@@ -146,11 +158,15 @@ def reconstruct_family(line: str) -> DependentFamily:
     s_agi = _pi(line, "s_agi")
     s_tax = _pi(line, "s_tax")
     s_wages = _pi(line, "s_wages")
+    s_total_income = _pi(line, "student_total_income")
+    if _has_value(line, "student_total_income"):
+        s_agi = s_total_income
 
     # Test ISIR reconstruction proxy: the fixed-width records expose generated
     # parent total income, but not always the wage inputs needed for payroll and
-    # employment allowances. Keep raw parent AGI as the earned-income proxy when
-    # it exists rather than treating generated total income as wages.
+    # employment allowances. Student records similarly expose generated total
+    # income separately from wage inputs. Keep raw earned-income fields as the
+    # payroll proxy rather than treating generated total income as wages.
     p1_wages = p_earned_income if p_earned_income > 0 else p_agi
     s_earned = s_wages if s_wages > 0 else s_agi
 
