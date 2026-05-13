@@ -38,6 +38,9 @@ _FIELDS = {
     "s_wages":  (710, 721),
     "s_agi":    (776, 786),
     "s_tax":    (786, 795),
+    "s_taxable_scholarships": (829, 836),
+    "s_foreign_income_exclusion": (836, 846),
+    "s_work_study": (2817, 2829),
     "s_agi_fti": (7101, 7111),
     "s_earned_fti": (7115, 7126),
     "s_tax_fti": (7126, 7135),
@@ -176,13 +179,22 @@ def reconstruct_family(line: str) -> DependentFamily:
     s_agi_fti = _pi(line, "s_agi_fti")
     s_earned_fti = _pi(line, "s_earned_fti")
     s_tax_fti = _pi(line, "s_tax_fti")
+    s_taxable_scholarships = _pi(line, "s_taxable_scholarships")
+    s_foreign_income_exclusion = _pi(line, "s_foreign_income_exclusion")
+    s_work_study = _pi(line, "s_work_study")
     s_total_income = _pi(line, "student_total_income")
+    has_student_total_income_proxy = False
     if _has_value(line, "s_agi_fti"):
         s_agi = s_agi_fti
     elif _has_value(line, "student_total_income"):
         s_agi = s_total_income
+        has_student_total_income_proxy = True
     if _has_value(line, "s_tax_fti"):
         s_tax = s_tax_fti
+    if has_student_total_income_proxy:
+        s_taxable_scholarships = 0
+        s_foreign_income_exclusion = 0
+        s_work_study = 0
 
     # Test ISIR reconstruction proxy: the fixed-width records expose generated
     # parent total income, but not always the wage inputs needed for payroll and
@@ -207,6 +219,9 @@ def reconstruct_family(line: str) -> DependentFamily:
         family_size=family_size,
         num_parents=num_parents,
         student_agi=s_agi,
+        student_foreign_income_exclusion=s_foreign_income_exclusion,
+        student_taxable_scholarships=s_taxable_scholarships,
+        student_work_study=s_work_study,
         student_income_tax_paid=s_tax,
         student_earned_income=s_earned,
     )
