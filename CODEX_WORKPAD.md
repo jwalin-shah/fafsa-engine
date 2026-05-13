@@ -413,3 +413,74 @@ Residual risk:
 - Product correctness is still not complete. The remaining failures are
   parent payroll/allowance propagation issues, and the no-parent-FTI records
   still should not be fixed by back-solving ED generated payroll outputs.
+
+## FAFSA-M Formula A Parent Filing Status Slice - 2026-05-13
+
+Branch: `codex/fafsa-parent-filing-status-slice`
+
+Scope: one narrow source-field reconstruction for parent FTI payroll tax.
+
+Diagnosis:
+
+- Baseline after `#23` was `35/42` Formula A records passing and `7/42`
+  failing.
+- ISIR line 86 had parent earned income `155895`, no spouse earned income,
+  parent FTIM filing status `4`, ED parent payroll tax `11374`, and engine
+  parent payroll tax `11925`.
+- The engine used `num_parents == 2` as the payroll jointness signal, which
+  selected the joint OASDI cap even when the real FTIM filing status was not
+  married filing jointly.
+
+Change:
+
+- `DependentFamily` now carries optional `parent_filing_status`.
+- ISIR reconstruction parses parent FTIM filing status from the real source
+  field immediately before parent FTIM AGI.
+- Formula A parent payroll tax uses `parent_filing_status == 2` for jointness
+  when that source field is present, and preserves the old `num_parents == 2`
+  fallback otherwise.
+- `tests/test_isir_validation.py` covers line 86 and updates the red baseline
+  to `36/42` passing and `6/42` failing.
+- `tests/test_fafsa_kb.py` covers the missing-filing-status fallback so
+  existing keyword callers keep the old `num_parents == 2` behavior.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result: passed, `22 passed`.
+
+```bash
+python3 -m pytest -q
+```
+
+Result: passed, `52 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
+Explicit gate check:
+
+```bash
+python3 - <<'PY'
+from fafsa.isir import validate_isir_file
+report = validate_isir_file('data/IDSA25OP-20240308.txt')
+print(f'Formula A gate: {report.passed}/{report.dependent_records} passed, {report.failed} failed, {report.skipped} skipped, all_passed={report.all_passed}')
+print('diagnostic_summary=', report.diagnostic_summary)
+print('failure_signature_summary=', report.failure_signature_summary)
+PY
+```
+
+Result: `36/42` passed, `6` failed, `0` skipped, `all_passed=False`.
+
+Residual risk:
+
+- Product correctness is still not complete. The five no-parent-FTI failures
+  still use generated parent total income as the wage proxy, and the remaining
+  parent-FTI failure has parent payroll/allowance drift plus downstream student
+  allowance drift.

@@ -57,6 +57,7 @@ class DependentFamily:
     student_investment_net_worth: int = 0
     student_business_farm_net_worth: int = 0
     max_pell_eligible: bool = False
+    parent_filing_status: int = 0
 
 
 @dataclass
@@ -198,7 +199,7 @@ def _prove_sai_dependent(family: DependentFamily) -> SAITrace:
     p_off = step("parent_income_offsets", family.parent_taxable_scholarships + family.parent_education_credits + family.parent_work_study, f"{REF}, Formula A, Line 2", "sum")
     p_total = step("parent_total_income", p_add - p_off, f"{REF}, Formula A, Line 3", "line 1 - line 2")
     
-    is_joint = family.num_parents == 2
+    is_joint = family.parent_filing_status == 2 if family.parent_filing_status else family.num_parents == 2
     combined_wages = family.parent_earned_income_p1 + family.parent_earned_income_p2
     p_tax = step("parent_income_tax_paid", family.parent_income_tax_paid, f"{REF}, Line 4", "input")
     p_pay = step("parent_payroll_tax", _medicare(combined_wages, is_joint) + _oasdi(combined_wages, is_joint), f"{REF}, Line 5", "Table A1")

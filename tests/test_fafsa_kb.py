@@ -58,6 +58,34 @@ def test_ed_round_halves_away_from_zero():
     assert _ed_round(-1174.5) == -1175
 
 
+def test_parent_payroll_jointness_falls_back_to_num_parents_without_filing_status():
+    base = DependentFamily(
+        parent_agi=155_895,
+        parent_income_tax_paid=0,
+        parent_earned_income_p1=155_895,
+        parent_earned_income_p2=0,
+        family_size=2,
+        num_parents=2,
+    )
+    joint_trace = prove_sai(base)
+    single_trace = prove_sai(
+        DependentFamily(
+            parent_agi=155_895,
+            parent_income_tax_paid=0,
+            parent_earned_income_p1=155_895,
+            parent_earned_income_p2=0,
+            family_size=2,
+            num_parents=2,
+            parent_filing_status=4,
+        )
+    )
+    joint_payroll = next(step.value for step in joint_trace.steps if step.label == "parent_payroll_tax")
+    single_payroll = next(step.value for step in single_trace.steps if step.label == "parent_payroll_tax")
+
+    assert joint_payroll == 11925
+    assert single_payroll == 11374
+
+
 from fafsa.validate import VerificationResult, make_family, verify
 
 
@@ -77,7 +105,7 @@ def test_verify_message_mentions_current_isir_count():
     family = make_family(42)
     trace = prove_sai(family)
     result = verify(trace)
-    assert "35/42" in result.message
+    assert "36/42" in result.message
     assert "Formula A dependent ED records" in result.message
 
 

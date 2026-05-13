@@ -31,8 +31,8 @@ Query: My parents make $80k, family of 4
   contribution of around $8,000. Your SAI is 8,150.
 
 [4/4] Verifying...
-❌ engine FAILED ED validation: 35/42 Formula A dependent ED records pass,
-7 fail, 0 skipped (103 file lines scanned). Engine output is not trustworthy.
+❌ engine FAILED ED validation: 36/42 Formula A dependent ED records pass,
+6 fail, 0 skipped (103 file lines scanned). Engine output is not trustworthy.
 ```
 
 ## Quick start
@@ -58,7 +58,7 @@ be reconciled before this is portable.
 - **Facts extracted** — the LLM reads your query and pulls out income, family size, and other variables
 - **Proof tree** — the engine computes every step deterministically, with a citation to the ED formula
 - **Narration** — the LLM explains the result in plain English
-- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local gate is currently red: 35 of 42 Formula A dependent records pass, 7 fail, and 0 are skipped.
+- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local gate is currently red: 36 of 42 Formula A dependent records pass, 6 fail, and 0 are skipped.
 
 The engine is the deterministic calculation layer. The LLM is the language layer. Because the current ED validation gate is red, treat computed results as experimental until the Formula A discrepancies are fixed.
 
@@ -72,38 +72,38 @@ Run:
 python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
 ```
 
-Current result: `32 passed`. These tests intentionally encode the red baseline
-so the public claim stays honest: `35/42` Formula A dependent ED records pass,
-`7/42` fail, and `0` are skipped.
+Current result: `34 passed`. These tests intentionally encode the red baseline
+so the public claim stays honest: `36/42` Formula A dependent ED records pass,
+`6/42` fail, and `0` are skipped.
 
 Failure taxonomy from the current gate:
 
 | Category | Count |
 |---|---:|
-| Engine SAI lower than ED target | 3 |
+| Engine SAI lower than ED target | 2 |
 | Engine SAI at `-1500` floor while ED target is higher | 1 |
 | Engine SAI higher than ED target | 4 |
-| Absolute delta within 1,000 | 7 |
+| Absolute delta within 1,000 | 6 |
 | Absolute delta from 1,001 to 10,000 | 0 |
 | Absolute delta from 10,001 to 50,000 | 0 |
 
-Aggregate mismatches across the 7 failing Formula A records are:
+Aggregate mismatches across the 6 failing Formula A records are:
 
 | ISIR output field | Mismatching records |
 |---|---:|
-| Student Aid Index (`sai`) | 7/7 |
-| Parent payroll tax | 7/7 |
-| Parent adjusted available income (`paai`) | 7/7 |
-| Parent total allowances | 7/7 |
-| Parent contribution (`pc`) | 7/7 |
-| Student available income | 1/7 |
-| Student total allowances | 1/7 |
+| Student Aid Index (`sai`) | 6/6 |
+| Parent payroll tax | 6/6 |
+| Parent adjusted available income (`paai`) | 6/6 |
+| Parent total allowances | 6/6 |
+| Parent contribution (`pc`) | 6/6 |
+| Student available income | 1/6 |
+| Student total allowances | 1/6 |
 
 The current red baseline now separates records by parent input source:
 
 | Parent input source | Total | Passed | Failed |
 |---|---:|---:|---:|
-| Parent FTI fields parsed | 36 | 34 | 2 |
+| Parent FTI fields parsed | 36 | 35 | 1 |
 | No parent FTI fields parsed | 6 | 1 | 5 |
 
 The six records without parsed parent FTI values are now reconstructed from
@@ -126,11 +126,11 @@ parent payroll tax delta, which isolates the visible residual to the
 generated-total-income wage proxy.
 Negative half-dollar values now round away from zero, matching the ED test ISIR
 record with student contribution from income `-1175` and moving the red gate to
-35/42. The remaining parent-FTI failures are
-`parent_payroll_tax,parent_total_allowances,paai,pc,sai`,
-and
+35/42. Parent FTIM filing status now controls payroll jointness when present,
+clearing one parent-FTI payroll-tax mismatch and moving the red gate to 36/42.
+The remaining parent-FTI failure is
 `parent_payroll_tax,parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai`,
-one record each.
+one record.
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
@@ -139,8 +139,7 @@ parent payroll tax, parent total allowances, `paai`, `pc`, student total
 allowances, student available income, `sci`, `sca`, and `sai`), the parent input
 source, and aggregate summaries by source and failure signature. The next
 correction slice can target the five no-parent-FTI reconstruction records
-separately from the remaining 3 records where parent FTI fields are already
-present.
+separately from the remaining parent FTI record.
 
 ## How it works
 
