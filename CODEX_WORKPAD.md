@@ -550,3 +550,88 @@ Residual risk:
   but still leaves product correctness blocked.
 - No-parent-FTI payroll should still not be fixed by back-solving ED generated
   payroll outputs.
+
+## FAFSA-O Formula A Manual Parent Source Slice - 2026-05-13
+
+Branch: `codex/fafsa-no-parent-fti-source-audit`
+
+Scope: one bounded source-field reconstruction slice for Formula A records with
+no parsed parent FTI fields, focused on replacing the generated-total-income
+wage proxy with manual wage, tax, and filing-status sources.
+
+Evidence:
+
+- Official ISIR layout workbook downloaded from FSA Partners:
+  `/tmp/fafsa-spec/isir-layout.xlsx`.
+- Parent manual source fields used by this slice:
+  - Filing status: position 1802.
+  - Income earned from work: positions 1803-1813.
+  - Adjusted gross income: positions 1869-1878.
+  - Income tax paid: positions 1879-1887.
+  - Spouse/partner income earned from work: positions 2295-2305.
+  - Spouse/partner adjusted gross income: positions 2361-2370.
+  - Spouse/partner income tax paid: positions 2371-2379.
+
+Diagnosis:
+
+- Baseline after `#25` was `36/42` Formula A records passing and `6/42`
+  failing.
+- The five no-parent-FTI failures all had self-reported parent manual income,
+  tax, and filing-status source fields available in the official layout.
+- One affected record used filing status code `3`, so the Medicare threshold
+  needed the married-filing-separately threshold rather than the ordinary
+  single threshold.
+
+Change:
+
+- `fafsa/isir.py` now parses parent and spouse/partner manual earned income,
+  AGI, and tax fields, plus parent manual filing status, for records without
+  parent FTI. The parsed AGI fields are asserted in tests, but the current
+  Formula A line 3 reconstruction still uses the earlier generated parent total
+  income source documented by prior slices.
+- `fafsa/kb.py` now applies the married-filing-separately Medicare threshold
+  when parent filing status is code `3`, with parent and spouse caps applied
+  separately when both wage fields are present.
+- Tests now assert representative no-parent-FTI records pass from manual source
+  fields rather than generated parent total income wage proxy behavior.
+- README public validation claims now encode the narrowed red gate:
+  `41/42` passing, `1/42` failing.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result: passed, `23 passed`.
+
+```bash
+python3 -m pytest tests/test_fafsa_kb.py tests/test_isir_validation.py -q
+```
+
+Result: passed, `37 passed`.
+
+Explicit gate check:
+
+```bash
+python3 - <<'PY'
+from fafsa.isir import validate_isir_file
+report = validate_isir_file('data/IDSA25OP-20240308.txt')
+print(f'{report.passed}/{report.dependent_records} failed={report.failed} all={report.all_passed}')
+print('diagnostic_summary=', report.diagnostic_summary)
+print('source_summary=', report.source_summary)
+print('failure_signature_summary=', report.failure_signature_summary)
+PY
+```
+
+Result: `41/42` passed, `1` failed, `0` skipped, `all_passed=False`.
+The no-parent-FTI source bucket is now `6` passed, `0` failed.
+
+Residual risk:
+
+- Product correctness is still not complete. One parent-FTI record remains red
+  with parent payroll/allowance drift and downstream negative-PAAI/student
+  allowance propagation.
+- The no-parent-FTI pass count still depends on the pre-existing generated
+  parent total income source for Formula A line 3. This slice only removes the
+  generated-total-income wage proxy from payroll reconstruction.

@@ -121,6 +121,7 @@ OASDI_BASE_SINGLE = 147_000
 OASDI_BASE_JOINT  = 294_000
 MEDICARE_RATE_LOW  = 0.0145
 MEDICARE_RATE_HIGH = 0.0235
+MEDICARE_THRESHOLD_MFS = 125_000
 MEDICARE_THRESHOLD_SINGLE = 200_000
 MEDICARE_THRESHOLD_JOINT  = 250_000
 EEA_MAX = 4_730
@@ -153,14 +154,35 @@ def _ipa(family_size: int) -> int:
 def _apa(age: int, num_parents: int) -> int:
     return 0
 
-def _medicare(wages: int, is_joint: bool) -> int:
-    threshold = MEDICARE_THRESHOLD_JOINT if is_joint else MEDICARE_THRESHOLD_SINGLE
+def _medicare(wages: int, is_joint: bool, filing_status: int = 0) -> int:
+    if filing_status == 3:
+        threshold = MEDICARE_THRESHOLD_MFS
+    else:
+        threshold = MEDICARE_THRESHOLD_JOINT if is_joint else MEDICARE_THRESHOLD_SINGLE
     if wages <= threshold: return _ed_round(wages * MEDICARE_RATE_LOW)
     return _ed_round(threshold * MEDICARE_RATE_LOW + (wages - threshold) * MEDICARE_RATE_HIGH)
 
 def _oasdi(wages: int, is_joint: bool) -> int:
     base = OASDI_BASE_JOINT if is_joint else OASDI_BASE_SINGLE
     return _ed_round(min(wages, base) * OASDI_RATE)
+
+
+def _parent_payroll_tax(parent_wages: int, spouse_wages: int, is_joint: bool, filing_status: int = 0) -> int:
+    combined_wages = parent_wages + spouse_wages
+    if is_joint:
+        return _medicare(combined_wages, True, filing_status) + _oasdi(combined_wages, True)
+    if filing_status == 3:
+        return (
+            _medicare(parent_wages, False, filing_status)
+            + _oasdi(parent_wages, False)
+            + _medicare(spouse_wages, False, filing_status)
+            + _oasdi(spouse_wages, False)
+        )
+    return (
+        _medicare(combined_wages, False, filing_status)
+        + _oasdi(combined_wages, False)
+    )
+
 
 def _business_farm_adjustment(net_worth: int) -> int:
     if net_worth < 1: return 0
@@ -202,7 +224,7 @@ def _prove_sai_dependent(family: DependentFamily) -> SAITrace:
     is_joint = family.parent_filing_status == 2 if family.parent_filing_status else family.num_parents == 2
     combined_wages = family.parent_earned_income_p1 + family.parent_earned_income_p2
     p_tax = step("parent_income_tax_paid", family.parent_income_tax_paid, f"{REF}, Line 4", "input")
-    p_pay = step("parent_payroll_tax", _medicare(combined_wages, is_joint) + _oasdi(combined_wages, is_joint), f"{REF}, Line 5", "Table A1")
+    p_pay = step("parent_payroll_tax", _parent_payroll_tax(family.parent_earned_income_p1, family.parent_earned_income_p2, is_joint, family.parent_filing_status), f"{REF}, Line 5", "Table A1")
     p_ipa = step("parent_income_protection_allowance", _ipa(family.family_size), f"{REF}, Line 6", "Table A2")
     p_eea = step("parent_employment_expense_allowance", min(_ed_round(combined_wages * EEA_RATE), EEA_MAX) if combined_wages > 0 else 0, f"{REF}, Line 7", "35% max 4730")
     p_total_allow = step("parent_total_allowances", p_tax + p_pay + p_ipa + p_eea, f"{REF}, Line 8", "sum")

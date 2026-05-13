@@ -1,5 +1,5 @@
 import pytest
-from fafsa.kb import DependentFamily, SAITrace, CitedValue, _ed_round, prove_sai, prove_sai_counterfactual, fmt_trace
+from fafsa.kb import DependentFamily, SAITrace, CitedValue, _ed_round, _medicare, _parent_payroll_tax, prove_sai, prove_sai_counterfactual, fmt_trace
 
 
 def test_prove_sai_returns_trace():
@@ -86,6 +86,15 @@ def test_parent_payroll_jointness_falls_back_to_num_parents_without_filing_statu
     assert single_payroll == 11374
 
 
+def test_medicare_uses_mfs_threshold_for_filing_status_3():
+    assert _medicare(158_000, False, filing_status=3) == 2588
+    assert _medicare(158_000, False, filing_status=3) > _medicare(158_000, False)
+
+
+def test_mfs_parent_payroll_tax_applies_caps_per_earner():
+    assert _parent_payroll_tax(100_000, 100_000, is_joint=False, filing_status=3) == 15300
+
+
 from fafsa.validate import VerificationResult, make_family, verify
 
 
@@ -105,7 +114,7 @@ def test_verify_message_mentions_current_isir_count():
     family = make_family(42)
     trace = prove_sai(family)
     result = verify(trace)
-    assert "36/42" in result.message
+    assert "41/42" in result.message
     assert "Formula A dependent ED records" in result.message
 
 

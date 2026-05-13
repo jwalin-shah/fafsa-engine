@@ -31,8 +31,8 @@ def test_isir_file_has_dependent_records(report):
 
 
 def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 36
-    assert report.failed == 6
+    assert report.passed == 41
+    assert report.failed == 1
     assert report.skipped == 0
     assert report.failures, "Expected current engine to disagree with ED records"
 
@@ -63,12 +63,12 @@ def test_failures_include_intermediate_diagnostics(report):
 
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
-        "sai": 6,
-        "parent_available_income": 6,
-        "parent_payroll_tax": 6,
-        "paai": 6,
-        "parent_total_allowances": 6,
-        "pc": 6,
+        "sai": 1,
+        "parent_available_income": 1,
+        "parent_payroll_tax": 1,
+        "paai": 1,
+        "parent_total_allowances": 1,
+        "pc": 1,
         "parents_negative_paai_allowance": 1,
         "student_available_income": 1,
         "student_total_allowances": 1,
@@ -77,18 +77,10 @@ def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
 
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
-        "no_parent_fti": {"total": 6, "passed": 1, "failed": 5, "skipped": 0},
+        "no_parent_fti": {"total": 6, "passed": 6, "failed": 0, "skipped": 0},
         "parent_fti": {"total": 36, "passed": 35, "failed": 1, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
-        "no_parent_fti": {
-            "paai": 5,
-            "parent_available_income": 5,
-            "parent_payroll_tax": 5,
-            "parent_total_allowances": 5,
-            "pc": 5,
-            "sai": 5,
-        },
         "parent_fti": {
             "sai": 1,
             "paai": 1,
@@ -105,7 +97,6 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
 
 def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
-        "no_parent_fti:parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,sai": 5,
         "parent_fti:parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,parents_negative_paai_allowance,student_total_allowances,student_available_income,sai": 1,
     }
 
@@ -284,61 +275,72 @@ def test_student_source_adjustments_reconstruct_formula_a_total_income():
     assert trace.sai == _pi(line, "sai")
 
 
-def test_no_parent_fti_reconstruction_uses_generated_parent_total_income(report):
-    no_parent_fti_failures = [
-        failure
-        for failure in report.failures
-        if failure["parent_input_source"] == "no_parent_fti"
+def test_no_parent_fti_reconstruction_uses_manual_parent_source_fields():
+    lines = ISIR_FILE.read_text().splitlines()
+
+    cases = [
+        {
+            "sai": 8292,
+            "manual_status": 3,
+            "manual_agi": 95078,
+            "spouse_agi": 0,
+            "manual_wages": 94999,
+            "spouse_wages": 0,
+            "manual_tax": 10042,
+            "spouse_tax": 0,
+        },
+        {
+            "sai": 1702,
+            "manual_status": 1,
+            "manual_agi": 42000,
+            "spouse_agi": 19000,
+            "manual_wages": 42000,
+            "spouse_wages": 19000,
+            "manual_tax": 2000,
+            "spouse_tax": 1000,
+        },
+        {
+            "sai": 46607,
+            "manual_status": 3,
+            "manual_agi": 158360,
+            "spouse_agi": 0,
+            "manual_wages": 158000,
+            "spouse_wages": 0,
+            "manual_tax": 27996,
+            "spouse_tax": 0,
+        },
     ]
 
-    assert no_parent_fti_failures
-    assert all(failure["p_agi"] > 0 for failure in no_parent_fti_failures)
-    assert all(
-        "eea" not in {item["field"] for item in failure["diagnostics"]}
-        for failure in no_parent_fti_failures
-    )
-    assert {
-        failure["parent_wage_proxy_source"]
-        for failure in no_parent_fti_failures
-    } == {"parent_total_income_proxy"}
-    assert all(
-        failure["parent_earned_income_p1"] == failure["p_agi"]
-        and failure["parent_earned_income_p2"] == 0
-        for failure in no_parent_fti_failures
-    )
+    for case in cases:
+        line = next(line for line in lines if _pi(line, "sai") == case["sai"])
+        family = reconstruct_family(line)
+        trace = prove_sai(family)
+        trace_values = {step.label: int(step.value) for step in trace.steps}
+
+        assert _pi(line, "p_manual_filing_status") == case["manual_status"]
+        assert _pi(line, "p_manual_agi") == case["manual_agi"]
+        assert _pi(line, "p_spouse_manual_agi") == case["spouse_agi"]
+        assert _pi(line, "p_manual_earned_income") == case["manual_wages"]
+        assert _pi(line, "p_spouse_manual_earned_income") == case["spouse_wages"]
+        assert _pi(line, "p_manual_tax") == case["manual_tax"]
+        assert _pi(line, "p_spouse_manual_tax") == case["spouse_tax"]
+        assert family.parent_agi == _pi(line, "parent_total_income")
+        assert family.parent_filing_status == case["manual_status"]
+        assert family.parent_earned_income_p1 == case["manual_wages"]
+        assert family.parent_earned_income_p2 == case["spouse_wages"]
+        assert family.parent_income_tax_paid == case["manual_tax"] + case["spouse_tax"]
+        assert trace_values["parent_payroll_tax"] == _pi(line, "parent_payroll_tax")
+        assert trace.sai == case["sai"]
 
 
-def test_no_parent_fti_failures_are_isolated_to_parent_payroll_proxy_in_diagnostics(report):
-    no_parent_fti_failures = [
-        failure
-        for failure in report.failures
-        if failure["parent_input_source"] == "no_parent_fti"
-    ]
-
-    assert no_parent_fti_failures
-    for failure in no_parent_fti_failures:
-        diagnostics = {item["field"]: item for item in failure["diagnostics"]}
-        assert set(diagnostics) == {
-            "parent_payroll_tax",
-            "parent_total_allowances",
-            "parent_available_income",
-            "paai",
-            "pc",
-            "sai",
-        }
-        assert (
-            diagnostics["parent_total_allowances"]["delta"]
-            == diagnostics["parent_payroll_tax"]["delta"]
-        )
-        assert (
-            diagnostics["paai"]["delta"]
-            == -diagnostics["parent_payroll_tax"]["delta"]
-        )
-        assert (
-            diagnostics["parent_available_income"]["delta"]
-            == -diagnostics["parent_payroll_tax"]["delta"]
-        )
-        assert failure["parent_wage_proxy_source"] == "parent_total_income_proxy"
+def test_no_parent_fti_records_now_pass_without_failure_diagnostics(report):
+    assert report.source_summary["no_parent_fti"] == {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+    }
+    assert all(failure["parent_input_source"] != "no_parent_fti" for failure in report.failures)
 
 
 def test_intermediate_comparison_names_expected_isir_fields():
