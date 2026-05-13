@@ -72,7 +72,7 @@ Run:
 python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
 ```
 
-Current result: `17 passed`. These tests intentionally encode the red baseline
+Current result: `21 passed`. These tests intentionally encode the red baseline
 so the public claim stays honest: `2/42` Formula A dependent ED records pass,
 `40/42` fail, and `0` are skipped.
 
@@ -95,7 +95,6 @@ Aggregate mismatches across the 40 failing Formula A records are:
 | Parent contribution (`pc`) | 40/40 |
 | Student Aid Index (`sai`) | 40/40 |
 | Student contribution from income (`sci`) | 10/40 |
-| Parent employment expense allowance (`eea`) | 7/40 |
 
 The current red baseline now separates records by parent input source:
 
@@ -104,11 +103,12 @@ The current red baseline now separates records by parent input source:
 | Parent FTI fields parsed | 35 | 2 | 33 |
 | No parent FTI fields parsed | 7 | 0 | 7 |
 
-The seven records without parsed parent FTI values account for all seven
-`eea` mismatches. Their failure signatures are `eea,paai,pc,sai` for six
-records and `eea,paai,pc,sci,sai` for one record. The remaining 33 failing
-records have parsed parent FTI values; 24 fail on `paai,pc,sai`, and 9 also
-fail on `sci`.
+The seven records without parsed parent FTI values are now reconstructed from
+the ED-published generated parent total income and total allowance fields, which
+clears the prior `eea` mismatch cluster. Their remaining failure signatures are
+`paai,pc,sai` for six records and `paai,pc,sci,sai` for one record. The
+remaining 33 failing records have parsed parent FTI values; 24 fail on
+`paai,pc,sai`, and 9 also fail on `sci`.
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
