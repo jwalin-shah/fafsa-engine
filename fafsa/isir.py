@@ -48,6 +48,13 @@ _FIELDS = {
     "s_tax_fti": (7126, 7135),
     
     # Parent Section
+    "p_manual_filing_status": (1801, 1802),
+    "p_manual_earned_income": (1802, 1813),
+    "p_manual_agi": (1868, 1878),
+    "p_manual_tax": (1878, 1887),
+    "p_spouse_manual_earned_income": (2294, 2305),
+    "p_spouse_manual_agi": (2360, 2370),
+    "p_spouse_manual_tax": (2370, 2379),
     "p_filing_status_fti": (7326, 7327),
     "p_agi_fti": (7327, 7337),
     "p_num_exemptions_fti": (7337, 7339),
@@ -130,6 +137,13 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_tax = _pi(line, "p_tax_fti")
     p_ira = _pi(line, "p_ira_fti")
     p_filing_status = _pi(line, "p_filing_status_fti")
+    p_manual_filing_status = _pi(line, "p_manual_filing_status")
+    p_manual_earned_income = _pi(line, "p_manual_earned_income")
+    p_manual_agi = _pi(line, "p_manual_agi")
+    p_manual_tax = _pi(line, "p_manual_tax")
+    p_spouse_manual_earned_income = _pi(line, "p_spouse_manual_earned_income")
+    p_spouse_manual_agi = _pi(line, "p_spouse_manual_agi")
+    p_spouse_manual_tax = _pi(line, "p_spouse_manual_tax")
     p_earned_income = _pi(line, "p_earned_fti")
     p_spouse_earned_income = _pi(line, "p_spouse_earned_fti")
     p_spouse_tax = _pi(line, "p_spouse_tax_fti")
@@ -151,16 +165,15 @@ def reconstruct_family(line: str) -> DependentFamily:
         p_ira = 0
 
     if parent_fti_missing:
-        parent_total_allowances = _pi(line, "parent_total_allowances")
-        if parent_total_allowances:
-            p_tax = max(
-                0,
-                parent_total_allowances
-                - _pi(line, "parent_payroll_tax")
-                - _pi(line, "ipa")
-                - _pi(line, "eea"),
-            )
-    
+        if p_manual_tax or p_spouse_manual_tax:
+            p_tax = p_manual_tax + p_spouse_manual_tax
+        if p_manual_filing_status:
+            p_filing_status = p_manual_filing_status
+        if p_manual_earned_income:
+            p_earned_income = p_manual_earned_income
+        if p_spouse_manual_earned_income:
+            p_spouse_earned_income = p_spouse_manual_earned_income
+
     # Family structure
     family_size = _pi(line, "p_fam_fti")
     num_parents = _pi(line, "p_num_fti")
