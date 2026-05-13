@@ -61,9 +61,15 @@ _FIELDS = {
     "p_num_dependents_fti": (7339, 7341),
     "p_earned_fti": (7341, 7352),
     "p_tax_fti": (7352, 7361),
+    "p_education_credits_fti": (7361, 7370),
+    "p_untaxed_ira_distributions_fti": (7370, 7381),
     "p_ira_fti": (7381, 7392),
+    "p_spouse_filing_status_fti": (7439, 7440),
+    "p_spouse_agi_fti": (7440, 7450),
     "p_spouse_earned_fti": (7454, 7465),
     "p_spouse_tax_fti": (7465, 7474),
+    "p_spouse_education_credits_fti": (7474, 7483),
+    "p_spouse_untaxed_ira_distributions_fti": (7483, 7494),
     "p_fam_fti": (7336, 7337),
     "p_num_fti": (7338, 7339),
     "p_cash":    (1945, 1952),
@@ -290,6 +296,24 @@ def _parent_wage_proxy_source(line: str, family: DependentFamily) -> str:
     return "none"
 
 
+def _parent_fti_source_context(line: str) -> dict[str, int]:
+    """Expose raw parent FTI source fields for debugging red ISIR records."""
+    return {
+        "parent_filing_status_fti": _pi(line, "p_filing_status_fti"),
+        "parent_agi_fti": _pi(line, "p_agi_fti"),
+        "parent_earned_fti": _pi(line, "p_earned_fti"),
+        "parent_tax_fti": _pi(line, "p_tax_fti"),
+        "parent_education_credits_fti": _pi(line, "p_education_credits_fti"),
+        "parent_untaxed_ira_distributions_fti": _pi(line, "p_untaxed_ira_distributions_fti"),
+        "parent_spouse_filing_status_fti": _pi(line, "p_spouse_filing_status_fti"),
+        "parent_spouse_agi_fti": _pi(line, "p_spouse_agi_fti"),
+        "parent_spouse_earned_fti": _pi(line, "p_spouse_earned_fti"),
+        "parent_spouse_tax_fti": _pi(line, "p_spouse_tax_fti"),
+        "parent_spouse_education_credits_fti": _pi(line, "p_spouse_education_credits_fti"),
+        "parent_spouse_untaxed_ira_distributions_fti": _pi(line, "p_spouse_untaxed_ira_distributions_fti"),
+    }
+
+
 def compare_isir_intermediates(line: str, trace: SAITrace) -> list[dict]:
     """Compare ED ISIR intermediates with the engine trace for Formula A."""
     trace_values = {step.label: int(step.value) for step in trace.steps}
@@ -371,6 +395,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
                 "parent_wage_proxy_source": parent_wage_proxy_source,
                 "parent_earned_income_p1": family.parent_earned_income_p1,
                 "parent_earned_income_p2": family.parent_earned_income_p2,
+                "parent_fti_source_context": _parent_fti_source_context(line),
                 "diagnostics": diagnostics,
                 "p_agi": family.parent_agi,
                 "p_tax": family.parent_income_tax_paid,

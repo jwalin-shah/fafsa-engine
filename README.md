@@ -72,7 +72,7 @@ Run:
 python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
 ```
 
-Current result: `37 passed`. These tests intentionally encode the red baseline
+Current result: `38 passed`. These tests intentionally encode the red baseline
 so the public claim stays honest: `41/42` Formula A dependent ED records pass,
 `1/42` fails, and `0` are skipped.
 
@@ -129,7 +129,10 @@ exist, round negative half-dollar values away from zero, and use parent FTIM
 filing status for payroll jointness when present.
 The remaining parent-FTI failure is
 `parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,parents_negative_paai_allowance,student_total_allowances,student_available_income,sai`,
-one record.
+one record. Failing records include a raw parent FTI source context block with
+separate parent and spouse/partner filing status, AGI, earned income, tax,
+education credits, and untaxed IRA distribution values so the remaining drift
+can be investigated from source fields rather than one-off parsing scripts.
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
