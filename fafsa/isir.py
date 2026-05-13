@@ -38,6 +38,9 @@ _FIELDS = {
     "s_wages":  (710, 721),
     "s_agi":    (776, 786),
     "s_tax":    (786, 795),
+    "s_agi_fti": (7101, 7111),
+    "s_earned_fti": (7115, 7126),
+    "s_tax_fti": (7126, 7135),
     
     # Parent Section
     "p_agi_fti": (7341, 7352),
@@ -170,9 +173,16 @@ def reconstruct_family(line: str) -> DependentFamily:
     s_agi = _pi(line, "s_agi")
     s_tax = _pi(line, "s_tax")
     s_wages = _pi(line, "s_wages")
+    s_agi_fti = _pi(line, "s_agi_fti")
+    s_earned_fti = _pi(line, "s_earned_fti")
+    s_tax_fti = _pi(line, "s_tax_fti")
     s_total_income = _pi(line, "student_total_income")
-    if _has_value(line, "student_total_income"):
+    if _has_value(line, "s_agi_fti"):
+        s_agi = s_agi_fti
+    elif _has_value(line, "student_total_income"):
         s_agi = s_total_income
+    if _has_value(line, "s_tax_fti"):
+        s_tax = s_tax_fti
 
     # Test ISIR reconstruction proxy: the fixed-width records expose generated
     # parent total income, but not always the wage inputs needed for payroll and
@@ -180,7 +190,10 @@ def reconstruct_family(line: str) -> DependentFamily:
     # income separately from wage inputs. Keep raw earned-income fields as the
     # payroll proxy rather than treating generated total income as wages.
     p1_wages = p_earned_income if p_earned_income > 0 else p_agi
-    s_earned = s_wages if s_wages > 0 else s_agi
+    if _has_value(line, "s_earned_fti"):
+        s_earned = s_earned_fti
+    else:
+        s_earned = s_wages if s_wages > 0 else s_agi
 
     return DependentFamily(
         parent_agi=p_agi,
