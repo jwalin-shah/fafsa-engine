@@ -72,7 +72,7 @@ def test_verify_message_mentions_current_isir_count():
     family = make_family(42)
     trace = prove_sai(family)
     result = verify(trace)
-    assert "33/42" in result.message
+    assert "34/42" in result.message
     assert "Formula A dependent ED records" in result.message
 
 
