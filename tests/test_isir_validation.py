@@ -225,6 +225,29 @@ def test_remaining_parent_fti_failure_exposes_negative_paai_allowance_drift(repo
     )
 
 
+def test_remaining_parent_fti_failure_includes_raw_fti_source_context(report):
+    failure = next(
+        failure
+        for failure in report.failures
+        if failure["parent_input_source"] == "parent_fti"
+    )
+
+    assert failure["parent_fti_source_context"] == {
+        "parent_filing_status_fti": 4,
+        "parent_agi_fti": 53025,
+        "parent_earned_fti": 49568,
+        "parent_tax_fti": 14589,
+        "parent_education_credits_fti": 2500,
+        "parent_untaxed_ira_distributions_fti": 30000,
+        "parent_spouse_filing_status_fti": 2,
+        "parent_spouse_agi_fti": 25689,
+        "parent_spouse_earned_fti": 25000,
+        "parent_spouse_tax_fti": 9568,
+        "parent_spouse_education_credits_fti": 0,
+        "parent_spouse_untaxed_ira_distributions_fti": 0,
+    }
+
+
 def test_student_reconstruction_uses_corrected_isir_offsets():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()

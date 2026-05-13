@@ -635,3 +635,46 @@ Residual risk:
 - The no-parent-FTI pass count still depends on the pre-existing generated
   parent total income source for Formula A line 3. This slice only removes the
   generated-total-income wage proxy from payroll reconstruction.
+
+## FAFSA-P Formula A Final Parent-FTI Context Diagnostics - 2026-05-13
+
+Branch: `codex/fafsa-final-fti-context-diagnostics`
+
+Scope: diagnostic-only slice for the single remaining Formula A parent-FTI
+failure after `#26`.
+
+Diagnosis:
+
+- Merged main is red at `41/42` Formula A records passing and `1/42` failing.
+- The only failing record is line 100 with target SAI `-921` and engine SAI
+  `-1500`.
+- Existing failure output exposed the downstream diagnostics but did not expose
+  the raw parent/spouse FTI source fields needed to reason about the remaining
+  tax/payroll drift without ad hoc fixed-width scripts.
+
+Change:
+
+- `fafsa/isir.py` now parses parent and spouse/partner FTI filing status, AGI,
+  earned income, tax, education credits, and untaxed IRA distribution source
+  fields for failure diagnostics.
+- Failing records now include a `parent_fti_source_context` dictionary.
+- `tests/test_isir_validation.py` locks the raw source context for the remaining
+  failing parent-FTI record.
+- README documents that failures include this source-context block.
+
+Validation:
+
+- `python3 -m pytest tests/test_isir_validation.py -q`
+- `python3 -m pytest -q`
+- `git diff --check`
+
+Results:
+
+- Focused ISIR validation: passed, `24 passed`.
+- Full suite: passed, `56 passed`.
+- Diff check: passed.
+
+Residual risk:
+
+- This does not change Formula A outputs and does not claim product correctness.
+  It only makes the final blocker easier to review from official source fields.
