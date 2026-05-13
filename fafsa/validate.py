@@ -23,6 +23,8 @@ class VerificationResult:
 
 
 def _ed_round_local(x: float) -> int:
+    if x < 0:
+        return math.ceil(x - 0.5)
     return math.floor(x + 0.5)
 
 

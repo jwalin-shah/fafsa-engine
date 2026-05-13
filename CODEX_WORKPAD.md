@@ -359,3 +359,57 @@ Residual risk:
   source in the parsed layout, so using generated parent total income as wages
   remains a proxy and should not be back-solved from ED generated payroll
   outputs.
+
+## FAFSA-L Formula A Negative Rounding Slice - 2026-05-13
+
+Branch: `codex/fafsa-negative-rounding-slice`
+
+Scope: one narrow formula correction for ED rounding of negative half-dollar
+values.
+
+Diagnosis:
+
+- Baseline after `#22` was `34/42` Formula A records passing and `8/42`
+  failing.
+- ISIR line 65 had only `sci,sai` mismatches: student available income
+  `-2349`, ED student contribution from income `-1175`, and engine result
+  `-1174`.
+- The formula path used `math.floor(x + 0.5)`, which rounds `-1174.5` toward
+  zero instead of away from zero.
+
+Change:
+
+- `fafsa.kb._ed_round()` now rounds negative half-dollar values away from zero.
+- `fafsa.validate._ed_round_local()` now matches the engine helper used by
+  deterministic random-family test fixture generation.
+- `tests/test_fafsa_kb.py` covers positive and negative half-dollar rounding.
+- `tests/test_isir_validation.py` and `README.md` update the red baseline to
+  `35/42` passing and `7/42` failing.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_fafsa_kb.py tests/test_isir_validation.py -q
+```
+
+Result: passed, `32 passed`.
+
+Explicit gate check:
+
+```bash
+python3 - <<'PY'
+from fafsa.isir import validate_isir_file
+report = validate_isir_file('data/IDSA25OP-20240308.txt')
+print(f'Formula A gate: {report.passed}/{report.dependent_records} passed, {report.failed} failed, {report.skipped} skipped, all_passed={report.all_passed}')
+print('diagnostic_summary=', report.diagnostic_summary)
+print('failure_signature_summary=', report.failure_signature_summary)
+PY
+```
+
+Result: `35/42` passed, `7` failed, `0` skipped, `all_passed=False`.
+
+Residual risk:
+
+- Product correctness is still not complete. The remaining failures are
+  parent payroll/allowance propagation issues, and the no-parent-FTI records
+  still should not be fixed by back-solving ED generated payroll outputs.
