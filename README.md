@@ -97,13 +97,26 @@ Aggregate mismatches across the 40 failing Formula A records are:
 | Student contribution from income (`sci`) | 10/40 |
 | Parent employment expense allowance (`eea`) | 7/40 |
 
+The current red baseline now separates records by parent input source:
+
+| Parent input source | Total | Passed | Failed |
+|---|---:|---:|---:|
+| Parent FTI fields parsed | 35 | 2 | 33 |
+| No parent FTI fields parsed | 7 | 0 | 7 |
+
+The seven records without parsed parent FTI values account for all seven
+`eea` mismatches. Their failure signatures are `eea,paai,pc,sai` for six
+records and `eea,paai,pc,sci,sai` for one record. The remaining 33 failing
+records have parsed parent FTI values; 24 fail on `paai,pc,sai`, and 9 also
+fail on `sci`.
+
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
 field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
-`paai`, `pc`, `sci`, `sca`, and `sai`), and `validate_isir_file()` exposes
-`report.diagnostic_summary` with the aggregate mismatch counts above. The next
-correction slice can use that summary to prioritize whether drift starts in
-reconstruction or formula arithmetic.
+`paai`, `pc`, `sci`, `sca`, and `sai`), the parent input source, and aggregate
+summaries by source and failure signature. The next correction slice can target
+the seven no-parent-FTI reconstruction records separately from the 33 records
+where parent FTI fields are already present.
 
 ## How it works
 
