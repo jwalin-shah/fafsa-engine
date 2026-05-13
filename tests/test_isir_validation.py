@@ -65,6 +65,7 @@ def test_failures_include_intermediate_diagnostics(report):
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
         "sai": 8,
+        "parent_payroll_tax": 7,
         "paai": 7,
         "parent_total_allowances": 7,
         "pc": 7,
@@ -82,6 +83,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
             "paai": 5,
+            "parent_payroll_tax": 5,
             "parent_total_allowances": 5,
             "pc": 5,
             "sai": 5,
@@ -89,6 +91,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
         "parent_fti": {
             "sai": 3,
             "paai": 2,
+            "parent_payroll_tax": 2,
             "parent_total_allowances": 2,
             "pc": 2,
             "sci": 1,
@@ -100,9 +103,9 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
 
 def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
-        "no_parent_fti:parent_total_allowances,paai,pc,sai": 5,
-        "parent_fti:parent_total_allowances,paai,pc,sai": 1,
-        "parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
+        "no_parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,sai": 5,
+        "parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,sai": 1,
+        "parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
         "parent_fti:sci,sai": 1,
     }
 
@@ -271,6 +274,34 @@ def test_no_parent_fti_reconstruction_uses_generated_parent_total_income(report)
     )
 
 
+def test_no_parent_fti_failures_are_isolated_to_parent_payroll_proxy_in_diagnostics(report):
+    no_parent_fti_failures = [
+        failure
+        for failure in report.failures
+        if failure["parent_input_source"] == "no_parent_fti"
+    ]
+
+    assert no_parent_fti_failures
+    for failure in no_parent_fti_failures:
+        diagnostics = {item["field"]: item for item in failure["diagnostics"]}
+        assert set(diagnostics) == {
+            "parent_payroll_tax",
+            "parent_total_allowances",
+            "paai",
+            "pc",
+            "sai",
+        }
+        assert (
+            diagnostics["parent_total_allowances"]["delta"]
+            == diagnostics["parent_payroll_tax"]["delta"]
+        )
+        assert (
+            diagnostics["paai"]["delta"]
+            == -diagnostics["parent_payroll_tax"]["delta"]
+        )
+        assert failure["parent_wage_proxy_source"] == "parent_total_income_proxy"
+
+
 def test_intermediate_comparison_names_expected_isir_fields():
     line = next(line for line in ISIR_FILE.read_text().splitlines() if _diagnostics_for_line(line))
     trace = prove_sai(reconstruct_family(line))
@@ -281,6 +312,7 @@ def test_intermediate_comparison_names_expected_isir_fields():
     assert {item["field"] for item in diagnostics} <= {
         "ipa",
         "eea",
+        "parent_payroll_tax",
         "parent_total_allowances",
         "paai",
         "pc",

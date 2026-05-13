@@ -92,6 +92,7 @@ Aggregate mismatches across the 8 failing Formula A records are:
 | ISIR output field | Mismatching records |
 |---|---:|
 | Student Aid Index (`sai`) | 8/8 |
+| Parent payroll tax | 7/8 |
 | Parent adjusted available income (`paai`) | 7/8 |
 | Parent total allowances | 7/8 |
 | Parent contribution (`pc`) | 7/8 |
@@ -119,19 +120,25 @@ reconstruction source. If a parent FTI spouse earning source is present while
 the parent 1 FTI AGI field is blank, the parser no longer backfills parent 1
 wages from generated parent total income. That clears one parent-FTI payroll
 allowance mismatch without using ED output values as an oracle. The remaining
-no-parent-FTI failure signature is `parent_total_allowances,paai,pc,sai` for
-five records. The remaining parent-FTI failures are
-`parent_total_allowances,paai,pc,sai`, `parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai`,
+no-parent-FTI failure signature is
+`parent_payroll_tax,parent_total_allowances,paai,pc,sai` for five records. In
+the current diagnostics model, the parent total allowance delta equals the
+parent payroll tax delta, which isolates the visible residual to the
+generated-total-income wage proxy.
+The remaining parent-FTI failures are
+`parent_payroll_tax,parent_total_allowances,paai,pc,sai`,
+`parent_payroll_tax,parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai`,
 and `sci,sai`, one record each.
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
 field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
-parent total allowances, `paai`, `pc`, student total allowances, student
-available income, `sci`, `sca`, and `sai`), the parent input source, and aggregate
-summaries by source and failure signature. The next correction slice can target
-the five no-parent-FTI reconstruction records separately from the remaining 3
-records where parent FTI fields are already present.
+parent payroll tax, parent total allowances, `paai`, `pc`, student total
+allowances, student available income, `sci`, `sca`, and `sai`), the parent input
+source, and aggregate summaries by source and failure signature. The next
+correction slice can target the five no-parent-FTI reconstruction records
+separately from the remaining 3 records where parent FTI fields are already
+present.
 
 ## How it works
 
