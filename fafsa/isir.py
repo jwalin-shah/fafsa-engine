@@ -98,20 +98,27 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_agi = _pi(line, "p_agi_fti")
     p_tax = _pi(line, "p_tax_fti")
     p_ira = _pi(line, "p_ira_fti")
+    p_earned_income = p_agi
+    parent_fti_missing = p_agi == 0 and p_tax == 0 and p_ira == 0
 
-    if p_agi == 0 and p_tax == 0 and p_ira == 0:
-        p_total_income = _pi(line, "parent_total_income")
-        if p_total_income:
-            p_agi = p_total_income
-            parent_total_allowances = _pi(line, "parent_total_allowances")
-            if parent_total_allowances:
-                p_tax = max(
-                    0,
-                    parent_total_allowances
-                    - _pi(line, "parent_payroll_tax")
-                    - _pi(line, "ipa")
-                    - _pi(line, "eea"),
-                )
+    p_total_income = _pi(line, "parent_total_income")
+    if p_total_income:
+        p_agi = p_total_income
+        # The generated parent total income is already Formula A line 3, so
+        # income additions such as deductible IRA payments must not be added
+        # again by the core formula engine.
+        p_ira = 0
+
+    if parent_fti_missing:
+        parent_total_allowances = _pi(line, "parent_total_allowances")
+        if parent_total_allowances:
+            p_tax = max(
+                0,
+                parent_total_allowances
+                - _pi(line, "parent_payroll_tax")
+                - _pi(line, "ipa")
+                - _pi(line, "eea"),
+            )
     
     # Family structure
     family_size = _pi(line, "p_fam_fti")
@@ -140,8 +147,11 @@ def reconstruct_family(line: str) -> DependentFamily:
     s_tax = _pi(line, "s_tax")
     s_wages = _pi(line, "s_wages")
 
-    # Correcting for common test record patterns:
-    p1_wages = p_agi
+    # Test ISIR reconstruction proxy: the fixed-width records expose generated
+    # parent total income, but not always the wage inputs needed for payroll and
+    # employment allowances. Keep raw parent AGI as the earned-income proxy when
+    # it exists rather than treating generated total income as wages.
+    p1_wages = p_earned_income if p_earned_income > 0 else p_agi
     s_earned = s_wages if s_wages > 0 else s_agi
 
     return DependentFamily(
