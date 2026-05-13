@@ -211,3 +211,77 @@ Gemini review:
 
 - `gemini` was installed, but `timeout 90 gemini -p ...` did not return a
   review before the bound expired.
+
+## FAFSA-J Formula A Slice - 2026-05-13
+
+Branch: `codex/fafsa-next-red-gate-slice-5`
+
+Scope: one more narrow, non-circular ED Formula A correctness slice against the
+remaining red gate, focused on no-parent-FTI wage/payroll evidence.
+
+Baseline reproduced:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result before changes: `19 passed`, with validation still at `34/42` Formula A
+records passing, `8/42` failing, and diagnostics
+`sai=8, parent_total_allowances=7, paai=7, pc=7,
+student_available_income=1, student_total_allowances=1, sci=1`.
+
+Diagnosis:
+
+- The official 2024-25 ISIR record layout distinguishes parent FTIM AGI at
+  positions `7328-7337` from parent total income earned at `7342-7352`.
+- The local parser had been naming the earned-income slice as `p_agi_fti`.
+  Runtime behavior mostly survived because generated parent total income
+  replaces Formula A line 3, but the diagnostic surface hid which source was
+  being used for wage/payroll reconstruction.
+- All 5 no-parent-FTI failures now explicitly show
+  `parent_wage_proxy_source=parent_total_income_proxy`, with parent earned
+  income equal to generated parent total income and no spouse earned-income
+  source. This exposes the unresolved missing source without back-solving from
+  ED generated payroll/allowance outputs.
+
+Change:
+
+- `fafsa/isir.py` now maps parent FTIM AGI, exemptions, dependents, earned
+  income, tax paid, and IRA deductible fields to their official layout slices.
+- Parent earned-income reconstruction now reads `p_earned_fti` explicitly.
+- Failing-record diagnostics now include `parent_wage_proxy_source`,
+  `parent_earned_income_p1`, and `parent_earned_income_p2`.
+- `tests/test_isir_validation.py` adds coverage that parent FTIM AGI and earned
+  income are distinct source fields and that no-parent-FTI failures use the
+  generated-total-income wage proxy.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result: `20 passed`.
+
+```bash
+python3 -m pytest -q
+```
+
+Result: `48 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
+Updated diagnostics: unchanged red gate, `34/42` pass, `8/42` fail,
+`all_passed=False`; aggregate counts remain
+`sai=8, parent_total_allowances=7, paai=7, pc=7,
+student_available_income=1, student_total_allowances=1, sci=1`.
+
+Gemini review:
+
+- `gemini` was installed, but the bounded run could not complete usefully:
+  unauthorized local tool calls were blocked, then the model quota was
+  exhausted before a review was returned.

@@ -46,9 +46,12 @@ _FIELDS = {
     "s_tax_fti": (7126, 7135),
     
     # Parent Section
-    "p_agi_fti": (7341, 7352),
-    "p_tax_fti": (7352, 7363),
-    "p_ira_fti": (7363, 7374),
+    "p_agi_fti": (7327, 7337),
+    "p_num_exemptions_fti": (7337, 7339),
+    "p_num_dependents_fti": (7339, 7341),
+    "p_earned_fti": (7341, 7352),
+    "p_tax_fti": (7352, 7361),
+    "p_ira_fti": (7381, 7392),
     "p_spouse_earned_fti": (7454, 7465),
     "p_spouse_tax_fti": (7465, 7474),
     "p_fam_fti": (7336, 7337),
@@ -120,7 +123,7 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_agi = _pi(line, "p_agi_fti")
     p_tax = _pi(line, "p_tax_fti")
     p_ira = _pi(line, "p_ira_fti")
-    p_earned_income = p_agi
+    p_earned_income = _pi(line, "p_earned_fti")
     p_spouse_earned_income = _pi(line, "p_spouse_earned_fti")
     p_spouse_tax = _pi(line, "p_spouse_tax_fti")
     p_tax += p_spouse_tax
@@ -247,6 +250,7 @@ def _is_dependent_record(line: str) -> bool:
 def _parent_input_source(line: str) -> str:
     if (
         _pi(line, "p_agi_fti")
+        or _pi(line, "p_earned_fti")
         or _pi(line, "p_tax_fti")
         or _pi(line, "p_ira_fti")
         or _pi(line, "p_spouse_earned_fti")
@@ -254,6 +258,15 @@ def _parent_input_source(line: str) -> str:
     ):
         return "parent_fti"
     return "no_parent_fti"
+
+
+def _parent_wage_proxy_source(line: str, family: DependentFamily) -> str:
+    """Describe the source used for parent earned income reconstruction."""
+    if _has_value(line, "p_earned_fti") or _has_value(line, "p_spouse_earned_fti"):
+        return "parent_fti_earned_income"
+    if family.parent_earned_income_p1 or family.parent_earned_income_p2:
+        return "parent_total_income_proxy"
+    return "none"
 
 
 def compare_isir_intermediates(line: str, trace: SAITrace) -> list[dict]:
@@ -311,6 +324,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
             
         # 2. Compute end-to-end
         trace = prove_sai(family)
+        parent_wage_proxy_source = _parent_wage_proxy_source(line, family)
         
         # 3. Verify
         if trace.sai == target_sai:
@@ -333,6 +347,9 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
                 "target": target_sai,
                 "actual": trace.sai,
                 "parent_input_source": parent_input_source,
+                "parent_wage_proxy_source": parent_wage_proxy_source,
+                "parent_earned_income_p1": family.parent_earned_income_p1,
+                "parent_earned_income_p2": family.parent_earned_income_p2,
                 "diagnostics": diagnostics,
                 "p_agi": family.parent_agi,
                 "p_tax": family.parent_income_tax_paid,
