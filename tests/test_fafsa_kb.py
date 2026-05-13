@@ -1,5 +1,5 @@
 import pytest
-from fafsa.kb import DependentFamily, SAITrace, CitedValue, prove_sai, prove_sai_counterfactual, fmt_trace
+from fafsa.kb import DependentFamily, SAITrace, CitedValue, _ed_round, prove_sai, prove_sai_counterfactual, fmt_trace
 
 
 def test_prove_sai_returns_trace():
@@ -53,6 +53,11 @@ def test_steps_are_cited_values():
         assert step.formula
 
 
+def test_ed_round_halves_away_from_zero():
+    assert _ed_round(1174.5) == 1175
+    assert _ed_round(-1174.5) == -1175
+
+
 from fafsa.validate import VerificationResult, make_family, verify
 
 
@@ -72,7 +77,7 @@ def test_verify_message_mentions_current_isir_count():
     family = make_family(42)
     trace = prove_sai(family)
     result = verify(trace)
-    assert "34/42" in result.message
+    assert "35/42" in result.message
     assert "Formula A dependent ED records" in result.message
 
 

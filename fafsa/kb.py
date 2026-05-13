@@ -140,6 +140,8 @@ IPA_C_ADDITIONAL = 9_140
 # ---------------------------------------------------------------------------
 
 def _ed_round(x: float) -> int:
+    if x < 0:
+        return math.ceil(x - 0.5)
     return math.floor(x + 0.5)
 
 def _ipa(family_size: int) -> int:

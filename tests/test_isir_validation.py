@@ -31,8 +31,8 @@ def test_isir_file_has_dependent_records(report):
 
 
 def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 34
-    assert report.failed == 8
+    assert report.passed == 35
+    assert report.failed == 7
     assert report.skipped == 0
     assert report.failures, "Expected current engine to disagree with ED records"
 
@@ -56,20 +56,18 @@ def test_failures_include_intermediate_diagnostics(report):
     first_failure = report.failures[0]
 
     assert first_failure["diagnostics"], "Expected failing records to include field-level diagnostics"
-    assert first_failure["parent_input_source"] == "parent_fti"
     diagnostic_fields = {item["field"] for item in first_failure["diagnostics"]}
     assert "sai" in diagnostic_fields
-    assert diagnostic_fields & {"paai", "pc", "sci", "eea", "sca"}
+    assert diagnostic_fields & {"paai", "pc", "eea", "sca"}
 
 
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
-        "sai": 8,
+        "sai": 7,
         "parent_payroll_tax": 7,
         "paai": 7,
         "parent_total_allowances": 7,
         "pc": 7,
-        "sci": 1,
         "student_available_income": 1,
         "student_total_allowances": 1,
     }
@@ -78,7 +76,7 @@ def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
         "no_parent_fti": {"total": 6, "passed": 1, "failed": 5, "skipped": 0},
-        "parent_fti": {"total": 36, "passed": 33, "failed": 3, "skipped": 0},
+        "parent_fti": {"total": 36, "passed": 34, "failed": 2, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
@@ -89,12 +87,11 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
             "sai": 5,
         },
         "parent_fti": {
-            "sai": 3,
+            "sai": 2,
             "paai": 2,
             "parent_payroll_tax": 2,
             "parent_total_allowances": 2,
             "pc": 2,
-            "sci": 1,
             "student_available_income": 1,
             "student_total_allowances": 1,
         },
@@ -106,7 +103,6 @@ def test_report_summarizes_current_failure_signatures(report):
         "no_parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,sai": 5,
         "parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,sai": 1,
         "parent_fti:parent_payroll_tax,parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
-        "parent_fti:sci,sai": 1,
     }
 
 
