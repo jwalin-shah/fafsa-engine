@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from fafsa.isir import validate_isir_file, ISIRReport
+from fafsa.isir import ISIRReport, compare_isir_intermediates, reconstruct_family, validate_isir_file
+from fafsa.kb import prove_sai
 
 
 ISIR_FILE = Path(__file__).parent.parent / "data" / "IDSA25OP-20240308.txt"
@@ -49,3 +50,29 @@ def test_report_distinguishes_file_lines_from_dependent_records(report):
 
 def test_report_all_passed_property_is_false_when_gate_is_red(report):
     assert not report.all_passed
+
+
+def test_failures_include_intermediate_diagnostics(report):
+    first_failure = report.failures[0]
+
+    assert first_failure["diagnostics"], "Expected failing records to include field-level diagnostics"
+    diagnostic_fields = {item["field"] for item in first_failure["diagnostics"]}
+    assert "sai" in diagnostic_fields
+    assert diagnostic_fields & {"paai", "pc", "sci", "eea", "sca"}
+
+
+def test_intermediate_comparison_names_expected_isir_fields():
+    line = next(line for line in ISIR_FILE.read_text().splitlines() if _diagnostics_for_line(line))
+    trace = prove_sai(reconstruct_family(line))
+
+    diagnostics = compare_isir_intermediates(line, trace)
+
+    assert diagnostics
+    assert {item["field"] for item in diagnostics} <= {"ipa", "eea", "paai", "pc", "sci", "sca", "sai"}
+    assert all({"field", "trace_label", "expected", "actual", "delta"} <= set(item) for item in diagnostics)
+
+
+def _diagnostics_for_line(line: str):
+    if len(line) < 7700 or line[187:188] != "A":
+        return []
+    return compare_isir_intermediates(line, prove_sai(reconstruct_family(line)))

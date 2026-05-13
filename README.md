@@ -72,7 +72,7 @@ Run:
 python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
 ```
 
-Current result: `15 passed`. These tests intentionally encode the red baseline
+Current result: `17 passed`. These tests intentionally encode the red baseline
 so the public claim stays honest: `2/42` Formula A dependent ED records pass,
 `40/42` fail, and `0` are skipped.
 
@@ -97,7 +97,10 @@ Intermediate-field drift is broad rather than a single dominant bug:
 | Parent employment expense allowance (`eea`) | 7/42 |
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
-slice does not claim ED validation is restored.
+slice does not claim ED validation is restored. Failing records now include
+field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
+`paai`, `pc`, `sci`, `sca`, and `sai`) so the next correction slice can tell
+whether drift starts in reconstruction or formula arithmetic.
 
 ## How it works
 
