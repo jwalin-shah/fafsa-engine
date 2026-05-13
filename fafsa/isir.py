@@ -5,7 +5,7 @@ test ISIR records (Institutional Student Information Records).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from fafsa.kb import IPA_TABLE, DependentFamily, SAITrace, prove_sai
@@ -54,6 +54,7 @@ class ISIRReport:
     failed: int
     skipped: int
     failures: list[dict]
+    diagnostic_summary: dict[str, int] = field(default_factory=dict)
 
     @property
     def all_passed(self) -> bool:
@@ -170,6 +171,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
 
     passed = failed = skipped = dependent_records = 0
     failures: list[dict] = []
+    diagnostic_summary: dict[str, int] = {}
 
     for lineno, line in enumerate(lines, 1):
         if not _is_dependent_record(line):
@@ -193,11 +195,15 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
             passed += 1
         else:
             failed += 1
+            diagnostics = compare_isir_intermediates(line, trace)
+            for item in diagnostics:
+                field_name = item["field"]
+                diagnostic_summary[field_name] = diagnostic_summary.get(field_name, 0) + 1
             failures.append({
                 "lineno": lineno,
                 "target": target_sai,
                 "actual": trace.sai,
-                "diagnostics": compare_isir_intermediates(line, trace),
+                "diagnostics": diagnostics,
                 "p_agi": family.parent_agi,
                 "p_tax": family.parent_income_tax_paid,
                 "s_agi": family.student_agi,
@@ -211,4 +217,8 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
         failed=failed,
         skipped=skipped,
         failures=failures,
+        diagnostic_summary=dict(sorted(
+            diagnostic_summary.items(),
+            key=lambda item: (-item[1], item[0]),
+        )),
     )

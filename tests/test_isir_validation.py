@@ -61,6 +61,16 @@ def test_failures_include_intermediate_diagnostics(report):
     assert diagnostic_fields & {"paai", "pc", "sci", "eea", "sca"}
 
 
+def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
+    assert report.diagnostic_summary == {
+        "paai": 40,
+        "pc": 40,
+        "sai": 40,
+        "sci": 10,
+        "eea": 7,
+    }
+
+
 def test_intermediate_comparison_names_expected_isir_fields():
     line = next(line for line in ISIR_FILE.read_text().splitlines() if _diagnostics_for_line(line))
     trace = prove_sai(reconstruct_family(line))
