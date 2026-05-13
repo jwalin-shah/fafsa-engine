@@ -55,6 +55,61 @@ Disposition:
 - FAFSA Engine has a green base validation command: `python3 -m pytest`.
 - Optional provider SDK behavior is now isolated behind adapter boundaries.
 
+## FAFSA-H Formula A Slice - 2026-05-13
+
+Branch: `codex/fafsa-next-red-gate-slice-3`
+
+Scope: one narrow, non-circular ED Formula A correctness slice against the
+remaining red gate.
+
+Baseline reproduced:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result before changes: `17 passed`, with validation at `33/42` Formula A
+records passing, `9/42` failing, and diagnostics
+`sai=9, parent_total_allowances=8, paai=8, pc=8,
+student_available_income=1, student_total_allowances=1, sci=1`.
+
+Diagnosis:
+
+- Failing line 72 had parent spouse FTI earnings (`51068`) and spouse tax, but
+  blank parent 1 FTI AGI.
+- `reconstruct_family()` was still backfilling parent 1 wages from generated
+  parent total income, so payroll tax was computed on both generated total
+  income and spouse earnings.
+- The source-field correction is to use explicit parent earned-income sources
+  when any are present, and only use generated parent total income as a wage
+  proxy when no parent earned-income source exists.
+
+Change:
+
+- `fafsa/isir.py` no longer backfills parent 1 wages from generated parent
+  total income when spouse FTI earning/tax evidence is present.
+- `tests/test_isir_validation.py` adds a regression test for the spouse-only
+  FTI earnings record.
+- README and verification-count tests now encode the new red baseline:
+  `34/42` pass, `8/42` fail.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result after change: `18 passed`.
+
+Updated diagnostics: `sai=8, parent_total_allowances=7, paai=7, pc=7,
+student_available_income=1, student_total_allowances=1, sci=1`.
+
+Residual risk:
+
+- The gate remains red. Remaining parent allowance/PAAI/PC mismatches still
+  require source-field or formula evidence and should not be fixed by
+  back-solving from generated ED outputs.
+
 ## PR Packaging - 2026-05-13
 
 Branch: `codex/fafsa-isir-validation-contract`

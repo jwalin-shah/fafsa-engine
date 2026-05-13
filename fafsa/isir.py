@@ -201,7 +201,17 @@ def reconstruct_family(line: str) -> DependentFamily:
     # employment allowances. Student records similarly expose generated total
     # income separately from wage inputs. Keep raw earned-income fields as the
     # payroll proxy rather than treating generated total income as wages.
-    p1_wages = p_earned_income if p_earned_income > 0 else p_agi
+    has_parent_earned_income_source = (
+        p_earned_income > 0
+        or p_spouse_earned_income > 0
+        or _has_value(line, "p_spouse_tax_fti")
+    )
+    if p_earned_income > 0:
+        p1_wages = p_earned_income
+    elif has_parent_earned_income_source:
+        p1_wages = 0
+    else:
+        p1_wages = p_agi
     if _has_value(line, "s_earned_fti"):
         s_earned = s_earned_fti
     else:

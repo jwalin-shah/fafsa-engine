@@ -31,8 +31,8 @@ def test_isir_file_has_dependent_records(report):
 
 
 def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 33
-    assert report.failed == 9
+    assert report.passed == 34
+    assert report.failed == 8
     assert report.skipped == 0
     assert report.failures, "Expected current engine to disagree with ED records"
 
@@ -64,10 +64,10 @@ def test_failures_include_intermediate_diagnostics(report):
 
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
-        "sai": 9,
-        "paai": 8,
-        "parent_total_allowances": 8,
-        "pc": 8,
+        "sai": 8,
+        "paai": 7,
+        "parent_total_allowances": 7,
+        "pc": 7,
         "sci": 1,
         "student_available_income": 1,
         "student_total_allowances": 1,
@@ -77,7 +77,7 @@ def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
         "no_parent_fti": {"total": 6, "passed": 1, "failed": 5, "skipped": 0},
-        "parent_fti": {"total": 36, "passed": 32, "failed": 4, "skipped": 0},
+        "parent_fti": {"total": 36, "passed": 33, "failed": 3, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
@@ -87,10 +87,10 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
             "sai": 5,
         },
         "parent_fti": {
-            "sai": 4,
-            "paai": 3,
-            "parent_total_allowances": 3,
-            "pc": 3,
+            "sai": 3,
+            "paai": 2,
+            "parent_total_allowances": 2,
+            "pc": 2,
             "sci": 1,
             "student_available_income": 1,
             "student_total_allowances": 1,
@@ -101,7 +101,7 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
 def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
         "no_parent_fti:parent_total_allowances,paai,pc,sai": 5,
-        "parent_fti:parent_total_allowances,paai,pc,sai": 2,
+        "parent_fti:parent_total_allowances,paai,pc,sai": 1,
         "parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
         "parent_fti:sci,sai": 1,
     }
@@ -148,6 +148,24 @@ def test_parent_fti_reconstruction_includes_spouse_earnings_and_tax():
     assert family.parent_earned_income_p2 == _pi(line, "p_spouse_earned_fti")
     assert trace_values["parent_total_allowances"] == _pi(line, "parent_total_allowances")
     assert trace.sai == 4514
+    assert trace.sai == _pi(line, "sai")
+
+
+def test_parent_fti_spouse_only_earnings_do_not_backfill_parent_wages():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == -61 and _pi(line, "p_spouse_earned_fti") == 51068
+    )
+    family = reconstruct_family(line)
+    trace = prove_sai(family)
+    trace_values = {step.label: int(step.value) for step in trace.steps}
+
+    assert not _pi(line, "p_agi_fti")
+    assert family.parent_agi == _pi(line, "parent_total_income")
+    assert family.parent_earned_income_p1 == 0
+    assert family.parent_earned_income_p2 == _pi(line, "p_spouse_earned_fti")
+    assert trace_values["parent_payroll_tax"] == _pi(line, "parent_payroll_tax")
+    assert trace.sai == -61
     assert trace.sai == _pi(line, "sai")
 
 
