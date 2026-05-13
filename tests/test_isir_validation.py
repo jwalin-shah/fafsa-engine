@@ -56,6 +56,7 @@ def test_failures_include_intermediate_diagnostics(report):
     first_failure = report.failures[0]
 
     assert first_failure["diagnostics"], "Expected failing records to include field-level diagnostics"
+    assert first_failure["parent_input_source"] == "parent_fti"
     diagnostic_fields = {item["field"] for item in first_failure["diagnostics"]}
     assert "sai" in diagnostic_fields
     assert diagnostic_fields & {"paai", "pc", "sci", "eea", "sca"}
@@ -68,6 +69,26 @@ def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
         "sai": 40,
         "sci": 10,
         "eea": 7,
+    }
+
+
+def test_report_summarizes_current_baseline_by_parent_input_source(report):
+    assert report.source_summary == {
+        "no_parent_fti": {"total": 7, "passed": 0, "failed": 7, "skipped": 0},
+        "parent_fti": {"total": 35, "passed": 2, "failed": 33, "skipped": 0},
+    }
+    assert report.diagnostic_summary_by_source == {
+        "no_parent_fti": {"eea": 7, "paai": 7, "pc": 7, "sai": 7, "sci": 1},
+        "parent_fti": {"paai": 33, "pc": 33, "sai": 33, "sci": 9},
+    }
+
+
+def test_report_summarizes_current_failure_signatures(report):
+    assert report.failure_signature_summary == {
+        "parent_fti:paai,pc,sai": 24,
+        "parent_fti:paai,pc,sci,sai": 9,
+        "no_parent_fti:eea,paai,pc,sai": 6,
+        "no_parent_fti:eea,paai,pc,sci,sai": 1,
     }
 
 

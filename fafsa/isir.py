@@ -55,6 +55,9 @@ class ISIRReport:
     skipped: int
     failures: list[dict]
     diagnostic_summary: dict[str, int] = field(default_factory=dict)
+    source_summary: dict[str, dict[str, int]] = field(default_factory=dict)
+    diagnostic_summary_by_source: dict[str, dict[str, int]] = field(default_factory=dict)
+    failure_signature_summary: dict[str, int] = field(default_factory=dict)
 
     @property
     def all_passed(self) -> bool:
@@ -144,6 +147,12 @@ def _is_dependent_record(line: str) -> bool:
     return len(line) >= 7700 and line[187:188] == "A"
 
 
+def _parent_input_source(line: str) -> str:
+    if _pi(line, "p_agi_fti") or _pi(line, "p_tax_fti") or _pi(line, "p_ira_fti"):
+        return "parent_fti"
+    return "no_parent_fti"
+
+
 def compare_isir_intermediates(line: str, trace: SAITrace) -> list[dict]:
     """Compare ED ISIR intermediates with the engine trace for Formula A."""
     trace_values = {step.label: int(step.value) for step in trace.steps}
@@ -172,6 +181,9 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
     passed = failed = skipped = dependent_records = 0
     failures: list[dict] = []
     diagnostic_summary: dict[str, int] = {}
+    source_summary: dict[str, dict[str, int]] = {}
+    diagnostic_summary_by_source: dict[str, dict[str, int]] = {}
+    failure_signature_summary: dict[str, int] = {}
 
     for lineno, line in enumerate(lines, 1):
         if not _is_dependent_record(line):
@@ -179,12 +191,19 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
 
         dependent_records += 1
         target_sai = _pi(line, "sai")
+        parent_input_source = _parent_input_source(line)
+        source_counts = source_summary.setdefault(
+            parent_input_source,
+            {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
+        )
+        source_counts["total"] += 1
         
         # 1. Reconstruct inputs
         try:
             family = reconstruct_family(line)
         except Exception:
             skipped += 1
+            source_counts["skipped"] += 1
             continue
             
         # 2. Compute end-to-end
@@ -193,16 +212,24 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
         # 3. Verify
         if trace.sai == target_sai:
             passed += 1
+            source_counts["passed"] += 1
         else:
             failed += 1
+            source_counts["failed"] += 1
             diagnostics = compare_isir_intermediates(line, trace)
+            source_diagnostics = diagnostic_summary_by_source.setdefault(parent_input_source, {})
             for item in diagnostics:
                 field_name = item["field"]
                 diagnostic_summary[field_name] = diagnostic_summary.get(field_name, 0) + 1
+                source_diagnostics[field_name] = source_diagnostics.get(field_name, 0) + 1
+            field_signature = ",".join(item["field"] for item in diagnostics)
+            signature_key = f"{parent_input_source}:{field_signature}"
+            failure_signature_summary[signature_key] = failure_signature_summary.get(signature_key, 0) + 1
             failures.append({
                 "lineno": lineno,
                 "target": target_sai,
                 "actual": trace.sai,
+                "parent_input_source": parent_input_source,
                 "diagnostics": diagnostics,
                 "p_agi": family.parent_agi,
                 "p_tax": family.parent_income_tax_paid,
@@ -219,6 +246,15 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
         failures=failures,
         diagnostic_summary=dict(sorted(
             diagnostic_summary.items(),
+            key=lambda item: (-item[1], item[0]),
+        )),
+        source_summary=dict(sorted(source_summary.items())),
+        diagnostic_summary_by_source={
+            source: dict(sorted(fields.items(), key=lambda item: (-item[1], item[0])))
+            for source, fields in sorted(diagnostic_summary_by_source.items())
+        },
+        failure_signature_summary=dict(sorted(
+            failure_signature_summary.items(),
             key=lambda item: (-item[1], item[0]),
         )),
     )
