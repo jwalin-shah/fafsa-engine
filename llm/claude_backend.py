@@ -11,10 +11,17 @@ _FIELDS_HINT = (
 )
 
 
+def _create_anthropic_client():
+    try:
+        import anthropic
+    except ImportError as exc:
+        raise RuntimeError("Install fafsa-engine[claude] to use ClaudeBackend.") from exc
+    return anthropic.Anthropic()
+
+
 class ClaudeBackend(LLMBackend):
-    def __init__(self, model: str = "claude-haiku-4-5-20251001"):
-        from anthropic import Anthropic
-        self.client = Anthropic()
+    def __init__(self, model: str = "claude-haiku-4-5-20251001", client=None):
+        self.client = client or _create_anthropic_client()
         self.model = model
 
     def extract_facts(self, query: str) -> dict:

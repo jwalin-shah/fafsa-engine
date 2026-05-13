@@ -5,3 +5,5 @@ __pycache__/
 dist/
 .DS_Store
 .env
+# CocoIndex Code (ccc)
+/.cocoindex_code/
