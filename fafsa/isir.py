@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from fafsa.kb import IPA_TABLE, _aai_to_parent_contribution, DependentFamily, prove_sai
+from fafsa.kb import IPA_TABLE, DependentFamily, SAITrace, prove_sai
 
 
 _DEFAULT_ISIR_PATH = Path(__file__).parent.parent / "data" / "IDSA25OP-20240308.txt"
@@ -63,6 +63,17 @@ class ISIRReport:
             and self.failed == 0
             and self.skipped == 0
         )
+
+
+_TRACE_TO_ISIR_FIELDS = {
+    "parent_income_protection_allowance": "ipa",
+    "parent_employment_expense_allowance": "eea",
+    "parent_adjusted_available_income": "paai",
+    "parent_contribution": "pc",
+    "student_contribution_from_income": "sci",
+    "student_contribution_from_assets": "sca",
+    "student_aid_index": "sai",
+}
 
 
 def _pi(line: str, key: str) -> int:
@@ -132,6 +143,24 @@ def _is_dependent_record(line: str) -> bool:
     return len(line) >= 7700 and line[187:188] == "A"
 
 
+def compare_isir_intermediates(line: str, trace: SAITrace) -> list[dict]:
+    """Compare ED ISIR intermediates with the engine trace for Formula A."""
+    trace_values = {step.label: int(step.value) for step in trace.steps}
+    diagnostics = []
+    for trace_label, field in _TRACE_TO_ISIR_FIELDS.items():
+        expected = _pi(line, field)
+        actual = trace_values.get(trace_label)
+        if actual != expected:
+            diagnostics.append({
+                "field": field,
+                "trace_label": trace_label,
+                "expected": expected,
+                "actual": actual,
+                "delta": None if actual is None else actual - expected,
+            })
+    return diagnostics
+
+
 def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
     """Run full system validation across all Formula A records in an ISIR file."""
     if path is None:
@@ -168,6 +197,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
                 "lineno": lineno,
                 "target": target_sai,
                 "actual": trace.sai,
+                "diagnostics": compare_isir_intermediates(line, trace),
                 "p_agi": family.parent_agi,
                 "p_tax": family.parent_income_tax_paid,
                 "s_agi": family.student_agi,
