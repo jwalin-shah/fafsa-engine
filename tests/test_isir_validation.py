@@ -31,8 +31,8 @@ def test_isir_file_has_dependent_records(report):
 
 
 def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 28
-    assert report.failed == 14
+    assert report.passed == 31
+    assert report.failed == 11
     assert report.skipped == 0
     assert report.failures, "Expected current engine to disagree with ED records"
 
@@ -64,47 +64,48 @@ def test_failures_include_intermediate_diagnostics(report):
 
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
-        "sai": 14,
-        "paai": 11,
-        "parent_total_allowances": 11,
-        "pc": 11,
+        "sai": 11,
+        "paai": 8,
+        "parent_total_allowances": 8,
+        "pc": 8,
         "sci": 4,
-        "student_available_income": 4,
-        "student_total_allowances": 4,
+        "student_available_income": 5,
+        "student_total_allowances": 5,
     }
 
 
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
-        "no_parent_fti": {"total": 7, "passed": 1, "failed": 6, "skipped": 0},
-        "parent_fti": {"total": 35, "passed": 27, "failed": 8, "skipped": 0},
+        "no_parent_fti": {"total": 6, "passed": 1, "failed": 5, "skipped": 0},
+        "parent_fti": {"total": 36, "passed": 30, "failed": 6, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
-            "paai": 6,
-            "parent_total_allowances": 6,
-            "pc": 6,
-            "sai": 6,
+            "paai": 5,
+            "parent_total_allowances": 5,
+            "pc": 5,
+            "sai": 5,
             "sci": 1,
             "student_available_income": 1,
             "student_total_allowances": 1,
         },
         "parent_fti": {
-            "sai": 8,
-            "paai": 5,
-            "parent_total_allowances": 5,
-            "pc": 5,
+            "sai": 6,
+            "paai": 3,
+            "parent_total_allowances": 3,
+            "pc": 3,
             "sci": 3,
-            "student_available_income": 3,
-            "student_total_allowances": 3,
+            "student_available_income": 4,
+            "student_total_allowances": 4,
         },
     }
 
 
 def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
-        "no_parent_fti:parent_total_allowances,paai,pc,sai": 5,
-        "parent_fti:parent_total_allowances,paai,pc,sai": 5,
+        "no_parent_fti:parent_total_allowances,paai,pc,sai": 4,
+        "parent_fti:parent_total_allowances,paai,pc,sai": 2,
+        "parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
         "parent_fti:student_total_allowances,student_available_income,sci,sai": 3,
         "no_parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sci,sai": 1,
     }
@@ -134,6 +135,23 @@ def test_parent_fti_reconstruction_uses_generated_parent_total_income():
     assert family.parent_earned_income_p1 == _pi(line, "p_agi_fti")
     assert family.parent_deductible_ira_payments == 0
     assert trace.sai == 2318
+    assert trace.sai == _pi(line, "sai")
+
+
+def test_parent_fti_reconstruction_includes_spouse_earnings_and_tax():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == 4514 and _pi(line, "parent_total_income") == 88021
+    )
+    family = reconstruct_family(line)
+    trace = prove_sai(family)
+    trace_values = {step.label: int(step.value) for step in trace.steps}
+
+    assert family.parent_income_tax_paid == _pi(line, "p_tax_fti") + _pi(line, "p_spouse_tax_fti")
+    assert family.parent_earned_income_p1 == _pi(line, "p_agi_fti")
+    assert family.parent_earned_income_p2 == _pi(line, "p_spouse_earned_fti")
+    assert trace_values["parent_total_allowances"] == _pi(line, "parent_total_allowances")
+    assert trace.sai == 4514
     assert trace.sai == _pi(line, "sai")
 
 

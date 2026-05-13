@@ -43,6 +43,8 @@ _FIELDS = {
     "p_agi_fti": (7341, 7352),
     "p_tax_fti": (7352, 7363),
     "p_ira_fti": (7363, 7374),
+    "p_spouse_earned_fti": (7454, 7465),
+    "p_spouse_tax_fti": (7465, 7474),
     "p_fam_fti": (7336, 7337),
     "p_num_fti": (7338, 7339),
     "p_cash":    (1945, 1952),
@@ -112,7 +114,16 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_tax = _pi(line, "p_tax_fti")
     p_ira = _pi(line, "p_ira_fti")
     p_earned_income = p_agi
-    parent_fti_missing = p_agi == 0 and p_tax == 0 and p_ira == 0
+    p_spouse_earned_income = _pi(line, "p_spouse_earned_fti")
+    p_spouse_tax = _pi(line, "p_spouse_tax_fti")
+    p_tax += p_spouse_tax
+    parent_fti_missing = (
+        p_agi == 0
+        and p_tax == 0
+        and p_ira == 0
+        and p_spouse_earned_income == 0
+        and p_spouse_tax == 0
+    )
 
     p_total_income = _pi(line, "parent_total_income")
     if p_total_income:
@@ -176,6 +187,7 @@ def reconstruct_family(line: str) -> DependentFamily:
         parent_deductible_ira_payments=p_ira,
         parent_income_tax_paid=p_tax,
         parent_earned_income_p1=p1_wages,
+        parent_earned_income_p2=p_spouse_earned_income,
         parent_cash_savings=p_cash,
         parent_investment_net_worth=p_invest,
         parent_business_farm_net_worth=p_bus,
@@ -192,7 +204,13 @@ def _is_dependent_record(line: str) -> bool:
 
 
 def _parent_input_source(line: str) -> str:
-    if _pi(line, "p_agi_fti") or _pi(line, "p_tax_fti") or _pi(line, "p_ira_fti"):
+    if (
+        _pi(line, "p_agi_fti")
+        or _pi(line, "p_tax_fti")
+        or _pi(line, "p_ira_fti")
+        or _pi(line, "p_spouse_earned_fti")
+        or _pi(line, "p_spouse_tax_fti")
+    ):
         return "parent_fti"
     return "no_parent_fti"
 
