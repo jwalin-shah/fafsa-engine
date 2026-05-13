@@ -136,16 +136,30 @@ def test_parent_child_support_reconstruction_uses_isir_layout_position():
 def test_parent_fti_reconstruction_uses_generated_parent_total_income():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
-        if _pi(line, "sai") == 2318 and _pi(line, "p_agi_fti") == 76589
+        if _pi(line, "sai") == 2318 and _pi(line, "p_earned_fti") == 76589
     )
     family = reconstruct_family(line)
     trace = prove_sai(family)
 
     assert family.parent_agi == _pi(line, "parent_total_income")
-    assert family.parent_earned_income_p1 == _pi(line, "p_agi_fti")
+    assert _pi(line, "p_agi_fti") == 78125
+    assert family.parent_earned_income_p1 == _pi(line, "p_earned_fti")
     assert family.parent_deductible_ira_payments == 0
     assert trace.sai == 2318
     assert trace.sai == _pi(line, "sai")
+
+
+def test_parent_fti_layout_distinguishes_agi_from_earned_income():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == 2318 and _pi(line, "p_earned_fti") == 76589
+    )
+    family = reconstruct_family(line)
+
+    assert _pi(line, "p_agi_fti") == 78125
+    assert _pi(line, "p_earned_fti") == 76589
+    assert family.parent_agi == _pi(line, "parent_total_income")
+    assert family.parent_earned_income_p1 == _pi(line, "p_earned_fti")
 
 
 def test_parent_fti_reconstruction_includes_spouse_earnings_and_tax():
@@ -158,7 +172,7 @@ def test_parent_fti_reconstruction_includes_spouse_earnings_and_tax():
     trace_values = {step.label: int(step.value) for step in trace.steps}
 
     assert family.parent_income_tax_paid == _pi(line, "p_tax_fti") + _pi(line, "p_spouse_tax_fti")
-    assert family.parent_earned_income_p1 == _pi(line, "p_agi_fti")
+    assert family.parent_earned_income_p1 == _pi(line, "p_earned_fti")
     assert family.parent_earned_income_p2 == _pi(line, "p_spouse_earned_fti")
     assert trace_values["parent_total_allowances"] == _pi(line, "parent_total_allowances")
     assert trace.sai == 4514
@@ -186,7 +200,7 @@ def test_parent_fti_spouse_only_earnings_do_not_backfill_parent_wages():
 def test_student_reconstruction_uses_corrected_isir_offsets():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
-        if _pi(line, "sai") == 6096 and _pi(line, "p_agi_fti") == 75000
+        if _pi(line, "sai") == 6096 and _pi(line, "p_earned_fti") == 75000
     )
     family = reconstruct_family(line)
     trace = prove_sai(family)
@@ -244,6 +258,15 @@ def test_no_parent_fti_reconstruction_uses_generated_parent_total_income(report)
     assert all(failure["p_agi"] > 0 for failure in no_parent_fti_failures)
     assert all(
         "eea" not in {item["field"] for item in failure["diagnostics"]}
+        for failure in no_parent_fti_failures
+    )
+    assert {
+        failure["parent_wage_proxy_source"]
+        for failure in no_parent_fti_failures
+    } == {"parent_total_income_proxy"}
+    assert all(
+        failure["parent_earned_income_p1"] == failure["p_agi"]
+        and failure["parent_earned_income_p2"] == 0
         for failure in no_parent_fti_failures
     )
 
