@@ -93,6 +93,7 @@ Aggregate mismatches across the 14 failing Formula A records are:
 |---|---:|
 | Student Aid Index (`sai`) | 14/14 |
 | Parent adjusted available income (`paai`) | 11/14 |
+| Parent total allowances | 11/14 |
 | Parent contribution (`pc`) | 11/14 |
 | Student contribution from income (`sci`) | 4/14 |
 | Student available income | 4/14 |
@@ -115,15 +116,17 @@ while retaining raw parent FTI AGI as the earned-income proxy for payroll and
 employment expense calculations. Student input fields now use corrected ISIR
 offsets, and generated student total income is used as the Formula A line 22
 reconstruction source. The remaining no-parent-FTI failure signatures are
-`paai,pc,sai` for five records and `paai,pc,student_total_allowances,student_available_income,sci,sai`
-for one record. The remaining parent-FTI failures are `paai,pc,sai` for five
-records and `student_total_allowances,student_available_income,sci,sai` for
-three records.
+`parent_total_allowances,paai,pc,sai` for five records and
+`parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sci,sai`
+for one record. The remaining parent-FTI failures are
+`parent_total_allowances,paai,pc,sai` for five records and
+`student_total_allowances,student_available_income,sci,sai` for three records.
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
 field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
-`paai`, `pc`, `sci`, `sca`, and `sai`), the parent input source, and aggregate
+parent total allowances, `paai`, `pc`, student total allowances, student
+available income, `sci`, `sca`, and `sai`), the parent input source, and aggregate
 summaries by source and failure signature. The next correction slice can target
 the six no-parent-FTI reconstruction records separately from the remaining 8
 records where parent FTI fields are already present.
