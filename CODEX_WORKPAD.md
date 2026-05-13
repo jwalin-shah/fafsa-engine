@@ -285,3 +285,77 @@ Gemini review:
 - `gemini` was installed, but the bounded run could not complete usefully:
   unauthorized local tool calls were blocked, then the model quota was
   exhausted before a review was returned.
+
+## FAFSA-K Formula A Diagnostic Slice - 2026-05-13
+
+Branch: `codex/fafsa-parent-wage-source-slice`
+
+Scope: one narrow, non-circular diagnostic slice against the remaining Formula
+A red gate, focused on parent allowance failures and the unresolved
+no-parent-FTI wage proxy.
+
+Diagnosis:
+
+- Current merged baseline remains `34/42` Formula A records passing and `8/42`
+  failing.
+- The five no-parent-FTI failures all use
+  `parent_wage_proxy_source=parent_total_income_proxy`.
+- For those five records in the current diagnostics model, the parent total
+  allowance delta exactly equals the parent payroll tax delta; income protection
+  allowance and employment expense allowance are already aligned, so the
+  visible residual is isolated to payroll tax computed from the
+  generated-total-income wage proxy.
+
+Change:
+
+- `fafsa/isir.py` now includes `parent_payroll_tax` in field-level intermediate
+  diagnostics.
+- `tests/test_isir_validation.py` asserts that no-parent-FTI failures are
+  isolated to the payroll proxy rather than an opaque total-allowance mismatch.
+- `README.md` updates the red-baseline diagnostic signatures.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result: passed, `21 passed`.
+
+```bash
+python3 -m pytest -q
+```
+
+Result: passed, `49 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
+Explicit gate check:
+
+```bash
+python3 - <<'PY'
+from fafsa.isir import validate_isir_file
+report = validate_isir_file('data/IDSA25OP-20240308.txt')
+print(f'Formula A gate: {report.passed}/{report.dependent_records} passed, {report.failed} failed, {report.skipped} skipped, all_passed={report.all_passed}')
+print('diagnostic_summary=', report.diagnostic_summary)
+print('failure_signature_summary=', report.failure_signature_summary)
+print('diagnostic_summary_by_source=', report.diagnostic_summary_by_source)
+PY
+```
+
+Result: `34/42` passed, `8` failed, `0` skipped, `all_passed=False`.
+The no-parent-FTI signature is now
+`parent_payroll_tax,parent_total_allowances,paai,pc,sai` for five records.
+
+Residual risk:
+
+- This is a diagnostic slice, not a reconstruction correction. It does not
+  change SAI outputs or improve the pass count.
+- The remaining no-parent-FTI records still lack a real parent earned-income
+  source in the parsed layout, so using generated parent total income as wages
+  remains a proxy and should not be back-solved from ED generated payroll
+  outputs.

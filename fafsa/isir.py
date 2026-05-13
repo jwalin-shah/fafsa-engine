@@ -90,6 +90,7 @@ class ISIRReport:
 _TRACE_TO_ISIR_FIELDS = {
     "parent_income_protection_allowance": "ipa",
     "parent_employment_expense_allowance": "eea",
+    "parent_payroll_tax": "parent_payroll_tax",
     "parent_total_allowances": "parent_total_allowances",
     "parent_adjusted_available_income": "paai",
     "parent_contribution": "pc",
