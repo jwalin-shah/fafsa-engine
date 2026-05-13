@@ -31,8 +31,8 @@ def test_isir_file_has_dependent_records(report):
 
 
 def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 31
-    assert report.failed == 11
+    assert report.passed == 32
+    assert report.failed == 10
     assert report.skipped == 0
     assert report.failures, "Expected current engine to disagree with ED records"
 
@@ -64,20 +64,21 @@ def test_failures_include_intermediate_diagnostics(report):
 
 def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
     assert report.diagnostic_summary == {
-        "sai": 11,
+        "sai": 10,
         "paai": 8,
         "parent_total_allowances": 8,
         "pc": 8,
-        "sci": 4,
-        "student_available_income": 5,
-        "student_total_allowances": 5,
+        "sci": 3,
+        "student_available_income": 3,
+        "student_total_income": 2,
+        "student_total_allowances": 1,
     }
 
 
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
         "no_parent_fti": {"total": 6, "passed": 1, "failed": 5, "skipped": 0},
-        "parent_fti": {"total": 36, "passed": 30, "failed": 6, "skipped": 0},
+        "parent_fti": {"total": 36, "passed": 31, "failed": 5, "skipped": 0},
     }
     assert report.diagnostic_summary_by_source == {
         "no_parent_fti": {
@@ -87,16 +88,17 @@ def test_report_summarizes_current_baseline_by_parent_input_source(report):
             "sai": 5,
             "sci": 1,
             "student_available_income": 1,
-            "student_total_allowances": 1,
+            "student_total_income": 1,
         },
         "parent_fti": {
-            "sai": 6,
+            "sai": 5,
             "paai": 3,
             "parent_total_allowances": 3,
             "pc": 3,
-            "sci": 3,
-            "student_available_income": 4,
-            "student_total_allowances": 4,
+            "sci": 2,
+            "student_available_income": 2,
+            "student_total_allowances": 1,
+            "student_total_income": 1,
         },
     }
 
@@ -105,9 +107,10 @@ def test_report_summarizes_current_failure_signatures(report):
     assert report.failure_signature_summary == {
         "no_parent_fti:parent_total_allowances,paai,pc,sai": 4,
         "parent_fti:parent_total_allowances,paai,pc,sai": 2,
+        "no_parent_fti:parent_total_allowances,paai,pc,student_total_income,student_available_income,sci,sai": 1,
         "parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sai": 1,
-        "parent_fti:student_total_allowances,student_available_income,sci,sai": 3,
-        "no_parent_fti:parent_total_allowances,paai,pc,student_total_allowances,student_available_income,sci,sai": 1,
+        "parent_fti:sci,sai": 1,
+        "parent_fti:student_total_income,student_available_income,sci,sai": 1,
     }
 
 
@@ -164,9 +167,27 @@ def test_student_reconstruction_uses_corrected_isir_offsets():
     trace = prove_sai(family)
 
     assert _pi(line, "student_total_income") == 3512
+    assert not _pi(line, "s_agi_fti")
     assert family.student_agi == _pi(line, "student_total_income")
     assert family.student_earned_income == _pi(line, "s_wages")
     assert trace.sai == 6096
+    assert trace.sai == _pi(line, "sai")
+
+
+def test_student_fti_reconstruction_uses_tax_and_earned_income_fields():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == -587 and _pi(line, "student_total_income") == 11056
+    )
+    family = reconstruct_family(line)
+    trace = prove_sai(family)
+    trace_values = {step.label: int(step.value) for step in trace.steps}
+
+    assert family.student_agi == _pi(line, "s_agi_fti")
+    assert family.student_income_tax_paid == _pi(line, "s_tax_fti")
+    assert family.student_earned_income == _pi(line, "s_earned_fti")
+    assert trace_values["student_total_allowances"] == _pi(line, "student_total_allowances")
+    assert trace.sai == -587
     assert trace.sai == _pi(line, "sai")
 
 
