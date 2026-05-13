@@ -119,6 +119,20 @@ def test_parent_asset_reconstruction_uses_isir_layout_positions():
     assert trace.sai == _pi(line, "sai")
 
 
+def test_parent_child_support_reconstruction_uses_isir_layout_position():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == 46607 and _pi(line, "parent_total_income") == 158360
+    )
+    family = reconstruct_family(line)
+    trace = prove_sai(family)
+    trace_values = {step.label: int(step.value) for step in trace.steps}
+
+    assert family.parent_child_support_received == 30000
+    assert family.parent_cash_savings == 26500
+    assert trace_values["parent_net_worth"] == 56500
+
+
 def test_parent_fti_reconstruction_uses_generated_parent_total_income():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()

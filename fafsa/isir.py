@@ -56,6 +56,7 @@ _FIELDS = {
     "p_cash":    (1945, 1952),
     "p_invest":  (1952, 1959),
     "p_bus":     (1959, 1966),
+    "p_child_support": (1938, 1945),
 }
 
 
@@ -171,6 +172,7 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_cash = _pi(line, "p_cash")
     p_invest = _pi(line, "p_invest")
     p_bus = _pi(line, "p_bus")
+    p_child_support = _pi(line, "p_child_support")
 
     # Student
     s_agi = _pi(line, "s_agi")
@@ -226,6 +228,7 @@ def reconstruct_family(line: str) -> DependentFamily:
         parent_cash_savings=p_cash,
         parent_investment_net_worth=p_invest,
         parent_business_farm_net_worth=p_bus,
+        parent_child_support_received=p_child_support,
         family_size=family_size,
         num_parents=num_parents,
         student_agi=s_agi,

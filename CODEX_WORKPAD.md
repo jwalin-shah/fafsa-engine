@@ -138,3 +138,76 @@ Blocker:
 - ED correctness remains red/blocked. This slice only packages the validation
   contract and LLM adapter boundary; it does not restore agreement with ED ISIR
   dependent-student records.
+
+## FAFSA-I Formula A Slice - 2026-05-13
+
+Branch: `codex/fafsa-next-red-gate-slice-4`
+
+Scope: one narrow, non-circular ED Formula A correctness slice against the
+remaining red gate.
+
+Baseline reproduced:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result before changes: `18 passed`, with validation at `34/42` Formula A
+records passing, `8/42` failing, and diagnostics
+`sai=8, parent_total_allowances=7, paai=7, pc=7,
+student_available_income=1, student_total_allowances=1, sci=1`.
+
+Diagnosis:
+
+- The official 2024-25 ISIR record layout identifies parent annual child
+  support received at positions `1939-1945`, immediately before parent cash at
+  `1946-1952`.
+- `DependentFamily` already includes `parent_child_support_received` in parent
+  net worth, but `reconstruct_family()` parsed only parent cash, investments,
+  and business/farm net worth.
+- Failing line 91 has source parent child support of `30000` and parent cash of
+  `26500`; the missing source field explained the asset-side portion of the
+  PAAI mismatch without using generated ED outputs.
+
+Change:
+
+- `fafsa/isir.py` now parses parent child support from the ISIR source field and
+  passes it into `DependentFamily`.
+- `tests/test_isir_validation.py` adds a regression test for the affected
+  source-field layout and resulting parent net worth.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_isir_validation.py -q
+```
+
+Result after change: `19 passed`.
+
+```bash
+python3 -m pytest -q
+```
+
+Result: `47 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
+Updated diagnostics: still `34/42` pass, `8/42` fail, `all_passed=False`.
+Aggregate diagnostic counts are unchanged:
+`sai=8, parent_total_allowances=7, paai=7, pc=7,
+student_available_income=1, student_total_allowances=1, sci=1`.
+
+Line 91 residual after the source-field fix:
+`parent_total_allowances delta=412`, `paai delta=-412`, `pc delta=-194`,
+`sai delta=-194`. The remaining mismatch appears tied to the unresolved
+no-parent-FTI payroll/wage proxy and should not be fixed by back-solving from
+generated ED output fields.
+
+Gemini review:
+
+- `gemini` was installed, but `timeout 90 gemini -p ...` did not return a
+  review before the bound expired.
