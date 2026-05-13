@@ -87,20 +87,23 @@ Failure taxonomy from the current gate:
 | Absolute delta from 1,001 to 10,000 | 25 |
 | Absolute delta from 10,001 to 50,000 | 4 |
 
-Intermediate-field drift is broad rather than a single dominant bug:
+Aggregate mismatches across the 40 failing Formula A records are:
 
 | ISIR output field | Mismatching records |
 |---|---:|
-| Parent adjusted available income (`paai`) | 42/42 |
-| Parent contribution (`pc`) | 41/42 |
-| Student contribution from income (`sci`) | 10/42 |
-| Parent employment expense allowance (`eea`) | 7/42 |
+| Parent adjusted available income (`paai`) | 40/40 |
+| Parent contribution (`pc`) | 40/40 |
+| Student Aid Index (`sai`) | 40/40 |
+| Student contribution from income (`sci`) | 10/40 |
+| Parent employment expense allowance (`eea`) | 7/40 |
 
 That spread points to formula and/or fixed-width reconstruction drift, so this
 slice does not claim ED validation is restored. Failing records now include
 field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
-`paai`, `pc`, `sci`, `sca`, and `sai`) so the next correction slice can tell
-whether drift starts in reconstruction or formula arithmetic.
+`paai`, `pc`, `sci`, `sca`, and `sai`), and `validate_isir_file()` exposes
+`report.diagnostic_summary` with the aggregate mismatch counts above. The next
+correction slice can use that summary to prioritize whether drift starts in
+reconstruction or formula arithmetic.
 
 ## How it works
 
