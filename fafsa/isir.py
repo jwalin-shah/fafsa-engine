@@ -103,6 +103,82 @@ class ISIRReport:
         )
 
 
+@dataclass(frozen=True)
+class ISIRRecord:
+    """Parsed view over one fixed-width ISIR record."""
+    line: str
+    lineno: int | None = None
+
+    def field_int(self, key: str) -> int:
+        s, e = _FIELDS[key]
+        v = self.line[s:e].strip().split()
+        if not v or v[0] == 'N/A': return 0
+        try:
+            return int(v[0])
+        except ValueError:
+            return 0
+
+    def has_value(self, key: str) -> bool:
+        s, e = _FIELDS[key]
+        v = self.line[s:e].strip().split()
+        return bool(v and v[0] != "N/A")
+
+    def has_manual_override(self, key: str) -> bool:
+        return self.has_value(key) and self.field_int(key) != 0
+
+    @property
+    def is_dependent_formula_a(self) -> bool:
+        return len(self.line) >= 7700 and self.line[187:188] == "A"
+
+    @property
+    def target_sai(self) -> int:
+        return self.field_int("sai")
+
+    @property
+    def parent_input_source(self) -> str:
+        if (
+            self.field_int("p_agi_fti")
+            or self.field_int("p_earned_fti")
+            or self.field_int("p_tax_fti")
+            or self.field_int("p_ira_fti")
+            or self.field_int("p_spouse_earned_fti")
+            or self.field_int("p_spouse_tax_fti")
+        ):
+            return "parent_fti"
+        return "no_parent_fti"
+
+    def reconstruct_family(self) -> DependentFamily:
+        return _reconstruct_family(self)
+
+    def compare_intermediates(self, trace: SAITrace) -> list[dict]:
+        return _compare_isir_intermediates(self, trace)
+
+    def parent_wage_proxy_source(self, family: DependentFamily) -> str:
+        """Describe the source used for parent earned income reconstruction."""
+        if self.has_value("p_earned_fti") or self.has_value("p_spouse_earned_fti"):
+            return "parent_fti_earned_income"
+        if family.parent_earned_income_p1 or family.parent_earned_income_p2:
+            return "parent_total_income_proxy"
+        return "none"
+
+    def parent_fti_source_context(self) -> dict[str, int]:
+        """Expose raw parent FTI source fields for debugging red ISIR records."""
+        return {
+            "parent_filing_status_fti": self.field_int("p_filing_status_fti"),
+            "parent_agi_fti": self.field_int("p_agi_fti"),
+            "parent_earned_fti": self.field_int("p_earned_fti"),
+            "parent_tax_fti": self.field_int("p_tax_fti"),
+            "parent_education_credits_fti": self.field_int("p_education_credits_fti"),
+            "parent_untaxed_ira_distributions_fti": self.field_int("p_untaxed_ira_distributions_fti"),
+            "parent_spouse_filing_status_fti": self.field_int("p_spouse_filing_status_fti"),
+            "parent_spouse_agi_fti": self.field_int("p_spouse_agi_fti"),
+            "parent_spouse_earned_fti": self.field_int("p_spouse_earned_fti"),
+            "parent_spouse_tax_fti": self.field_int("p_spouse_tax_fti"),
+            "parent_spouse_education_credits_fti": self.field_int("p_spouse_education_credits_fti"),
+            "parent_spouse_untaxed_ira_distributions_fti": self.field_int("p_spouse_untaxed_ira_distributions_fti"),
+        }
+
+
 _TRACE_TO_ISIR_FIELDS = {
     "parent_income_protection_allowance": "ipa",
     "parent_employment_expense_allowance": "eea",
@@ -122,41 +198,37 @@ _TRACE_TO_ISIR_FIELDS = {
 
 
 def _pi(line: str, key: str) -> int:
-    s, e = _FIELDS[key]
-    v = line[s:e].strip().split()
-    if not v or v[0] == 'N/A': return 0
-    try:
-        return int(v[0])
-    except ValueError:
-        return 0
+    return ISIRRecord(line).field_int(key)
 
 
 def _has_value(line: str, key: str) -> bool:
-    s, e = _FIELDS[key]
-    v = line[s:e].strip().split()
-    return bool(v and v[0] != "N/A")
+    return ISIRRecord(line).has_value(key)
 
 
 def _has_manual_override(line: str, key: str) -> bool:
-    return _has_value(line, key) and _pi(line, key) != 0
+    return ISIRRecord(line).has_manual_override(key)
 
 
 def reconstruct_family(line: str) -> DependentFamily:
     """Reconstruct a DependentFamily from an ISIR record."""
-    p_agi = _pi(line, "p_agi_fti")
-    p_tax = _pi(line, "p_tax_fti")
-    p_ira = _pi(line, "p_ira_fti")
-    p_filing_status = _pi(line, "p_filing_status_fti")
-    p_manual_filing_status = _pi(line, "p_manual_filing_status")
-    p_manual_earned_income = _pi(line, "p_manual_earned_income")
-    p_manual_agi = _pi(line, "p_manual_agi")
-    p_manual_tax = _pi(line, "p_manual_tax")
-    p_spouse_manual_earned_income = _pi(line, "p_spouse_manual_earned_income")
-    p_spouse_manual_agi = _pi(line, "p_spouse_manual_agi")
-    p_spouse_manual_tax = _pi(line, "p_spouse_manual_tax")
-    p_earned_income = _pi(line, "p_earned_fti")
-    p_spouse_earned_income = _pi(line, "p_spouse_earned_fti")
-    p_spouse_tax = _pi(line, "p_spouse_tax_fti")
+    return ISIRRecord(line).reconstruct_family()
+
+
+def _reconstruct_family(record: ISIRRecord) -> DependentFamily:
+    p_agi = record.field_int("p_agi_fti")
+    p_tax = record.field_int("p_tax_fti")
+    p_ira = record.field_int("p_ira_fti")
+    p_filing_status = record.field_int("p_filing_status_fti")
+    p_manual_filing_status = record.field_int("p_manual_filing_status")
+    p_manual_earned_income = record.field_int("p_manual_earned_income")
+    p_manual_agi = record.field_int("p_manual_agi")
+    p_manual_tax = record.field_int("p_manual_tax")
+    p_spouse_manual_earned_income = record.field_int("p_spouse_manual_earned_income")
+    p_spouse_manual_agi = record.field_int("p_spouse_manual_agi")
+    p_spouse_manual_tax = record.field_int("p_spouse_manual_tax")
+    p_earned_income = record.field_int("p_earned_fti")
+    p_spouse_earned_income = record.field_int("p_spouse_earned_fti")
+    p_spouse_tax = record.field_int("p_spouse_tax_fti")
     parent_fti_missing = (
         p_agi == 0
         and p_tax == 0
@@ -165,23 +237,23 @@ def reconstruct_family(line: str) -> DependentFamily:
         and p_spouse_tax == 0
     )
 
-    if _has_manual_override(line, "p_manual_agi") or _has_manual_override(line, "p_spouse_manual_agi"):
+    if record.has_manual_override("p_manual_agi") or record.has_manual_override("p_spouse_manual_agi"):
         p_agi = (
-            p_manual_agi if _has_manual_override(line, "p_manual_agi") else p_agi
+            p_manual_agi if record.has_manual_override("p_manual_agi") else p_agi
         ) + (
-            p_spouse_manual_agi if _has_manual_override(line, "p_spouse_manual_agi") else 0
+            p_spouse_manual_agi if record.has_manual_override("p_spouse_manual_agi") else 0
         )
-    if _has_manual_override(line, "p_manual_tax"):
+    if record.has_manual_override("p_manual_tax"):
         p_tax = p_manual_tax
-    if _has_manual_override(line, "p_spouse_manual_tax"):
+    if record.has_manual_override("p_spouse_manual_tax"):
         p_spouse_tax = p_spouse_manual_tax
-    if _has_manual_override(line, "p_manual_earned_income"):
+    if record.has_manual_override("p_manual_earned_income"):
         p_earned_income = p_manual_earned_income
-    if _has_manual_override(line, "p_spouse_manual_earned_income"):
+    if record.has_manual_override("p_spouse_manual_earned_income"):
         p_spouse_earned_income = p_spouse_manual_earned_income
     p_tax += p_spouse_tax
 
-    p_total_income = _pi(line, "parent_total_income")
+    p_total_income = record.field_int("parent_total_income")
     if p_total_income:
         p_agi = p_total_income
         # The generated parent total income is already Formula A line 3, so
@@ -194,12 +266,12 @@ def reconstruct_family(line: str) -> DependentFamily:
             p_filing_status = p_manual_filing_status
 
     # Family structure
-    family_size = _pi(line, "p_fam_fti")
-    num_parents = _pi(line, "p_num_fti")
+    family_size = record.field_int("p_fam_fti")
+    num_parents = record.field_int("p_num_fti")
     
     # Backfill from IPA if FTI fields are 0
     if family_size == 0:
-        ipa = _pi(line, "ipa")
+        ipa = record.field_int("ipa")
         for size, val in IPA_TABLE.items():
             if val == ipa:
                 family_size = size
@@ -208,32 +280,32 @@ def reconstruct_family(line: str) -> DependentFamily:
             family_size = 6 + (ipa - 58560) // 6610
 
     if num_parents == 0:
-        num_parents = 2 if _pi(line, "eea") > 0 else 1
+        num_parents = 2 if record.field_int("eea") > 0 else 1
 
     # Assets
-    p_cash = _pi(line, "p_cash")
-    p_invest = _pi(line, "p_invest")
-    p_bus = _pi(line, "p_bus")
-    p_child_support = _pi(line, "p_child_support")
+    p_cash = record.field_int("p_cash")
+    p_invest = record.field_int("p_invest")
+    p_bus = record.field_int("p_bus")
+    p_child_support = record.field_int("p_child_support")
 
     # Student
-    s_agi = _pi(line, "s_agi")
-    s_tax = _pi(line, "s_tax")
-    s_wages = _pi(line, "s_wages")
-    s_agi_fti = _pi(line, "s_agi_fti")
-    s_earned_fti = _pi(line, "s_earned_fti")
-    s_tax_fti = _pi(line, "s_tax_fti")
-    s_taxable_scholarships = _pi(line, "s_taxable_scholarships")
-    s_foreign_income_exclusion = _pi(line, "s_foreign_income_exclusion")
-    s_work_study = _pi(line, "s_work_study")
-    s_total_income = _pi(line, "student_total_income")
+    s_agi = record.field_int("s_agi")
+    s_tax = record.field_int("s_tax")
+    s_wages = record.field_int("s_wages")
+    s_agi_fti = record.field_int("s_agi_fti")
+    s_earned_fti = record.field_int("s_earned_fti")
+    s_tax_fti = record.field_int("s_tax_fti")
+    s_taxable_scholarships = record.field_int("s_taxable_scholarships")
+    s_foreign_income_exclusion = record.field_int("s_foreign_income_exclusion")
+    s_work_study = record.field_int("s_work_study")
+    s_total_income = record.field_int("student_total_income")
     has_student_total_income_proxy = False
-    if _has_value(line, "s_agi_fti"):
+    if record.has_value("s_agi_fti"):
         s_agi = s_agi_fti
-    elif _has_value(line, "student_total_income"):
+    elif record.has_value("student_total_income"):
         s_agi = s_total_income
         has_student_total_income_proxy = True
-    if _has_value(line, "s_tax_fti"):
+    if record.has_value("s_tax_fti"):
         s_tax = s_tax_fti
     if has_student_total_income_proxy:
         s_taxable_scholarships = 0
@@ -248,7 +320,7 @@ def reconstruct_family(line: str) -> DependentFamily:
     has_parent_earned_income_source = (
         p_earned_income > 0
         or p_spouse_earned_income > 0
-        or _has_value(line, "p_spouse_tax_fti")
+        or record.has_value("p_spouse_tax_fti")
     )
     if p_earned_income > 0:
         p1_wages = p_earned_income
@@ -256,7 +328,7 @@ def reconstruct_family(line: str) -> DependentFamily:
         p1_wages = 0
     else:
         p1_wages = p_agi
-    if _has_value(line, "s_earned_fti"):
+    if record.has_value("s_earned_fti"):
         s_earned = s_earned_fti
     else:
         s_earned = s_wages if s_wages > 0 else s_agi
@@ -284,55 +356,33 @@ def reconstruct_family(line: str) -> DependentFamily:
 
 
 def _is_dependent_record(line: str) -> bool:
-    return len(line) >= 7700 and line[187:188] == "A"
+    return ISIRRecord(line).is_dependent_formula_a
 
 
 def _parent_input_source(line: str) -> str:
-    if (
-        _pi(line, "p_agi_fti")
-        or _pi(line, "p_earned_fti")
-        or _pi(line, "p_tax_fti")
-        or _pi(line, "p_ira_fti")
-        or _pi(line, "p_spouse_earned_fti")
-        or _pi(line, "p_spouse_tax_fti")
-    ):
-        return "parent_fti"
-    return "no_parent_fti"
+    return ISIRRecord(line).parent_input_source
 
 
 def _parent_wage_proxy_source(line: str, family: DependentFamily) -> str:
     """Describe the source used for parent earned income reconstruction."""
-    if _has_value(line, "p_earned_fti") or _has_value(line, "p_spouse_earned_fti"):
-        return "parent_fti_earned_income"
-    if family.parent_earned_income_p1 or family.parent_earned_income_p2:
-        return "parent_total_income_proxy"
-    return "none"
+    return ISIRRecord(line).parent_wage_proxy_source(family)
 
 
 def _parent_fti_source_context(line: str) -> dict[str, int]:
     """Expose raw parent FTI source fields for debugging red ISIR records."""
-    return {
-        "parent_filing_status_fti": _pi(line, "p_filing_status_fti"),
-        "parent_agi_fti": _pi(line, "p_agi_fti"),
-        "parent_earned_fti": _pi(line, "p_earned_fti"),
-        "parent_tax_fti": _pi(line, "p_tax_fti"),
-        "parent_education_credits_fti": _pi(line, "p_education_credits_fti"),
-        "parent_untaxed_ira_distributions_fti": _pi(line, "p_untaxed_ira_distributions_fti"),
-        "parent_spouse_filing_status_fti": _pi(line, "p_spouse_filing_status_fti"),
-        "parent_spouse_agi_fti": _pi(line, "p_spouse_agi_fti"),
-        "parent_spouse_earned_fti": _pi(line, "p_spouse_earned_fti"),
-        "parent_spouse_tax_fti": _pi(line, "p_spouse_tax_fti"),
-        "parent_spouse_education_credits_fti": _pi(line, "p_spouse_education_credits_fti"),
-        "parent_spouse_untaxed_ira_distributions_fti": _pi(line, "p_spouse_untaxed_ira_distributions_fti"),
-    }
+    return ISIRRecord(line).parent_fti_source_context()
 
 
 def compare_isir_intermediates(line: str, trace: SAITrace) -> list[dict]:
     """Compare ED ISIR intermediates with the engine trace for Formula A."""
+    return ISIRRecord(line).compare_intermediates(trace)
+
+
+def _compare_isir_intermediates(record: ISIRRecord, trace: SAITrace) -> list[dict]:
     trace_values = {step.label: int(step.value) for step in trace.steps}
     diagnostics = []
     for trace_label, field in _TRACE_TO_ISIR_FIELDS.items():
-        expected = _pi(line, field)
+        expected = record.field_int(field)
         actual = trace_values.get(trace_label)
         if actual != expected:
             diagnostics.append({
@@ -360,12 +410,13 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
     failure_signature_summary: dict[str, int] = {}
 
     for lineno, line in enumerate(lines, 1):
-        if not _is_dependent_record(line):
+        record = ISIRRecord(line, lineno)
+        if not record.is_dependent_formula_a:
             continue
 
         dependent_records += 1
-        target_sai = _pi(line, "sai")
-        parent_input_source = _parent_input_source(line)
+        target_sai = record.target_sai
+        parent_input_source = record.parent_input_source
         source_counts = source_summary.setdefault(
             parent_input_source,
             {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
@@ -374,7 +425,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
         
         # 1. Reconstruct inputs
         try:
-            family = reconstruct_family(line)
+            family = record.reconstruct_family()
         except Exception:
             skipped += 1
             source_counts["skipped"] += 1
@@ -382,7 +433,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
             
         # 2. Compute end-to-end
         trace = prove_sai(family)
-        parent_wage_proxy_source = _parent_wage_proxy_source(line, family)
+        parent_wage_proxy_source = record.parent_wage_proxy_source(family)
         
         # 3. Verify
         if trace.sai == target_sai:
@@ -391,7 +442,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
         else:
             failed += 1
             source_counts["failed"] += 1
-            diagnostics = compare_isir_intermediates(line, trace)
+            diagnostics = record.compare_intermediates(trace)
             source_diagnostics = diagnostic_summary_by_source.setdefault(parent_input_source, {})
             for item in diagnostics:
                 field_name = item["field"]
@@ -408,7 +459,7 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
                 "parent_wage_proxy_source": parent_wage_proxy_source,
                 "parent_earned_income_p1": family.parent_earned_income_p1,
                 "parent_earned_income_p2": family.parent_earned_income_p2,
-                "parent_fti_source_context": _parent_fti_source_context(line),
+                "parent_fti_source_context": record.parent_fti_source_context(),
                 "diagnostics": diagnostics,
                 "p_agi": family.parent_agi,
                 "p_tax": family.parent_income_tax_paid,

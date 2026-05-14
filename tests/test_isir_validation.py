@@ -10,7 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from fafsa.isir import ISIRReport, _FIELDS, _pi, compare_isir_intermediates, reconstruct_family, validate_isir_file
+from fafsa.isir import (
+    ISIRRecord,
+    ISIRReport,
+    _FIELDS,
+    _pi,
+    compare_isir_intermediates,
+    reconstruct_family,
+    validate_isir_file,
+)
 from fafsa.kb import prove_sai
 
 
@@ -64,11 +72,24 @@ def test_report_has_no_failure_diagnostics_when_gate_is_green(report):
     assert report.failure_signature_summary == {}
 
 
+def test_isir_record_exposes_formula_a_validation_inputs():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if ISIRRecord(line).is_dependent_formula_a
+    )
+    record = ISIRRecord(line, lineno=1)
+
+    assert record.is_dependent_formula_a
+    assert record.target_sai == _pi(line, "sai")
+    assert record.parent_input_source in {"parent_fti", "no_parent_fti"}
+    assert record.reconstruct_family().family_size > 0
+
+
 def test_isir_validator_fails_when_expected_sai_is_corrupted(tmp_path):
     lines = ISIR_FILE.read_text().splitlines()
     dependent_index, line = next(
         (index, line) for index, line in enumerate(lines)
-        if len(line) >= 7700 and line[187:188] == "A"
+        if ISIRRecord(line).is_dependent_formula_a
     )
     lines[dependent_index] = _replace_field(line, "sai", str(_pi(line, "sai") + 1))
     corrupted_file = tmp_path / "corrupted-isir.txt"
@@ -427,6 +448,7 @@ def test_intermediate_comparison_names_expected_isir_fields():
 
 
 def _diagnostics_for_line(line: str):
-    if len(line) < 7700 or line[187:188] != "A":
+    record = ISIRRecord(line)
+    if not record.is_dependent_formula_a:
         return []
-    return compare_isir_intermediates(line, prove_sai(reconstruct_family(line)))
+    return record.compare_intermediates(prove_sai(record.reconstruct_family()))
