@@ -137,6 +137,10 @@ def _has_value(line: str, key: str) -> bool:
     return bool(v and v[0] != "N/A")
 
 
+def _has_manual_override(line: str, key: str) -> bool:
+    return _has_value(line, key) and _pi(line, key) != 0
+
+
 def reconstruct_family(line: str) -> DependentFamily:
     """Reconstruct a DependentFamily from an ISIR record."""
     p_agi = _pi(line, "p_agi_fti")
@@ -161,13 +165,19 @@ def reconstruct_family(line: str) -> DependentFamily:
         and p_spouse_tax == 0
     )
 
-    if _has_value(line, "p_manual_tax"):
+    if _has_manual_override(line, "p_manual_agi") or _has_manual_override(line, "p_spouse_manual_agi"):
+        p_agi = (
+            p_manual_agi if _has_manual_override(line, "p_manual_agi") else p_agi
+        ) + (
+            p_spouse_manual_agi if _has_manual_override(line, "p_spouse_manual_agi") else 0
+        )
+    if _has_manual_override(line, "p_manual_tax"):
         p_tax = p_manual_tax
-    if _has_value(line, "p_spouse_manual_tax"):
+    if _has_manual_override(line, "p_spouse_manual_tax"):
         p_spouse_tax = p_spouse_manual_tax
-    if _has_value(line, "p_manual_earned_income"):
+    if _has_manual_override(line, "p_manual_earned_income"):
         p_earned_income = p_manual_earned_income
-    if _has_value(line, "p_spouse_manual_earned_income"):
+    if _has_manual_override(line, "p_spouse_manual_earned_income"):
         p_spouse_earned_income = p_spouse_manual_earned_income
     p_tax += p_spouse_tax
 

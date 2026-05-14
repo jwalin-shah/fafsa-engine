@@ -17,6 +17,11 @@ from fafsa.kb import prove_sai
 ISIR_FILE = Path(__file__).parent.parent / "data" / "IDSA25OP-20240308.txt"
 
 
+def _replace_field(line: str, key: str, value: str) -> str:
+    start, end = _FIELDS[key]
+    return line[:start] + value.ljust(end - start)[: end - start] + line[end:]
+
+
 @pytest.fixture(scope="module")
 def report() -> ISIRReport:
     if not ISIR_FILE.exists():
@@ -197,6 +202,22 @@ def test_parent_fti_self_reported_spouse_fields_override_spouse_fti_values():
     assert trace.sai == _pi(line, "sai")
 
 
+def test_parent_self_reported_agi_overrides_parent_fti_agi_without_total_income_proxy():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == -921 and _pi(line, "p_agi_fti") == 53025
+    )
+    line = _replace_field(line, "parent_total_income", "")
+    line = _replace_field(line, "p_manual_agi", "61000")
+    line = _replace_field(line, "p_spouse_manual_agi", "9000")
+
+    family = reconstruct_family(line)
+
+    assert _pi(line, "p_agi_fti") == 53025
+    assert _pi(line, "p_spouse_agi_fti") == 25689
+    assert family.parent_agi == 70000
+
+
 def test_student_reconstruction_uses_corrected_isir_offsets():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
@@ -315,18 +336,17 @@ def test_no_parent_fti_records_now_pass_without_failure_diagnostics(report):
     assert all(failure["parent_input_source"] != "no_parent_fti" for failure in report.failures)
 
 
-def test_self_reported_zero_replaces_populated_parent_spouse_fti_field():
+def test_self_reported_zero_does_not_replace_populated_parent_spouse_fti_field():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
         if _pi(line, "sai") == -921 and _pi(line, "p_spouse_tax_fti") == 9568
     )
-    start, end = _FIELDS["p_spouse_manual_tax"]
-    line_with_zero_manual_tax = line[:start] + "0".ljust(end - start) + line[end:]
+    line_with_zero_manual_tax = _replace_field(line, "p_spouse_manual_tax", "0")
 
     family = reconstruct_family(line_with_zero_manual_tax)
 
     assert _pi(line_with_zero_manual_tax, "p_spouse_manual_tax") == 0
-    assert family.parent_income_tax_paid == _pi(line, "p_tax_fti")
+    assert family.parent_income_tax_paid == _pi(line, "p_tax_fti") + _pi(line, "p_spouse_tax_fti")
 
 
 def test_intermediate_comparison_names_expected_isir_fields():
