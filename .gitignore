@@ -5,5 +5,15 @@ __pycache__/
 dist/
 .DS_Store
 .env
+.local/
+.pytest_cache/
+.uv-cache/
+.tldr/
+.rtk/
+runs/
+outputs/
+artifacts/
+logs/
+*.log
 # CocoIndex Code (ccc)
 /.cocoindex_code/
