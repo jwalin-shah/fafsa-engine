@@ -1,0 +1,27 @@
+name: Local validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest requests
+
+      - name: Run authoritative local validation
+        run: python3 -m pytest -q
+
+      - name: Check patch whitespace
+        run: git diff --check

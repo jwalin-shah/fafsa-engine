@@ -64,6 +64,25 @@ def test_report_has_no_failure_diagnostics_when_gate_is_green(report):
     assert report.failure_signature_summary == {}
 
 
+def test_isir_validator_fails_when_expected_sai_is_corrupted(tmp_path):
+    lines = ISIR_FILE.read_text().splitlines()
+    dependent_index, line = next(
+        (index, line) for index, line in enumerate(lines)
+        if len(line) >= 7700 and line[187:188] == "A"
+    )
+    lines[dependent_index] = _replace_field(line, "sai", str(_pi(line, "sai") + 1))
+    corrupted_file = tmp_path / "corrupted-isir.txt"
+    corrupted_file.write_text("\n".join(lines) + "\n")
+
+    corrupted_report = validate_isir_file(corrupted_file)
+
+    assert not corrupted_report.all_passed
+    assert corrupted_report.passed == 41
+    assert corrupted_report.failed == 1
+    assert corrupted_report.skipped == 0
+    assert corrupted_report.failures[0]["diagnostics"][-1]["field"] == "sai"
+
+
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
         "no_parent_fti": {"total": 6, "passed": 6, "failed": 0, "skipped": 0},
