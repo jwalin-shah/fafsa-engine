@@ -66,17 +66,20 @@ The engine is the deterministic calculation layer. The LLM is the language layer
 
 > **What "verified" means here:** `verify()` reports whether the local engine's final SAI outputs currently agree with ED's published dependent-student test records. "Verified" means final-output validation against ED's published Formula A test data; it still does *not* mean every input you provide has been individually checked against ED or that every comparable intermediate field matches ED.
 
-## Current ED validation status
+## Local validation gate
 
-Run:
+Before PR handoff, run the same local validation gate used by CI:
 
 ```bash
-python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
+python3 -m pytest -q
 ```
 
-Current result: `36 passed`. These tests intentionally encode the green
-baseline so the public claim stays honest: `42/42` Formula A dependent ED
-records pass, `0/42` fail, and `0` are skipped.
+Current result: `56 passed`. This is the authoritative local command for the
+repo: it runs the ED ISIR gate, core formula/verification tests, and mocked LLM
+backend tests without requiring provider secrets or optional hosted SDKs. The
+suite intentionally encodes the green baseline so the public claim stays
+honest: `42/42` Formula A dependent ED records pass, `0/42` fail, and `0` are
+skipped.
 
 The current green baseline separates records by parent input source:
 
