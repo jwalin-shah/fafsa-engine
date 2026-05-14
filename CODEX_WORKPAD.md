@@ -1,5 +1,37 @@
 # FAFSA Engine Workpad
 
+## WP-086 Shallow Module Deepening - 2026-05-14
+
+Branch: `codex/WP-086-shallow-module-deepening`
+
+Scope: deepen the ISIR reconstruction/validation boundary without changing
+Formula A behavior.
+
+Change:
+
+- `fafsa.isir` now exposes `ISIRRecord`, a small parsed view over one fixed-width
+  ISIR line for field parsing, Formula A record detection, parent input source
+  classification, family reconstruction, intermediate comparison, and failure
+  context.
+- `validate_isir_file()` now depends on `ISIRRecord` instead of duplicating raw
+  fixed-width checks and helper ordering.
+- Focused ISIR tests now exercise the record interface for Formula A selection
+  and diagnostics instead of repeating the raw length/formula slice predicate.
+
+Validation:
+
+```bash
+python3 -m pytest -q
+```
+
+Result: passed, `58 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
 ## Portfolio Readiness Validation - 2026-05-12
 
 Scope: make the existing validation suite runnable in a base development
