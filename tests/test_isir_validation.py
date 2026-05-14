@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from fafsa.isir import ISIRReport, _pi, compare_isir_intermediates, reconstruct_family, validate_isir_file
+from fafsa.isir import ISIRReport, _FIELDS, _pi, compare_isir_intermediates, reconstruct_family, validate_isir_file
 from fafsa.kb import prove_sai
 
 
@@ -30,11 +30,11 @@ def test_isir_file_has_dependent_records(report):
     assert report.total_file_lines > report.dependent_records
 
 
-def test_engine_validation_matches_current_red_baseline(report):
-    assert report.passed == 41
-    assert report.failed == 1
+def test_engine_validation_matches_current_green_baseline(report):
+    assert report.passed == 42
+    assert report.failed == 0
     assert report.skipped == 0
-    assert report.failures, "Expected current engine to disagree with ED records"
+    assert not report.failures
 
 
 def test_isir_count_is_42(report):
@@ -48,56 +48,21 @@ def test_report_distinguishes_file_lines_from_dependent_records(report):
     assert report.dependent_records == report.passed + report.failed + report.skipped
 
 
-def test_report_all_passed_property_is_false_when_gate_is_red(report):
-    assert not report.all_passed
+def test_report_all_passed_property_is_true_when_gate_is_green(report):
+    assert report.all_passed
 
 
-def test_failures_include_intermediate_diagnostics(report):
-    first_failure = report.failures[0]
-
-    assert first_failure["diagnostics"], "Expected failing records to include field-level diagnostics"
-    diagnostic_fields = {item["field"] for item in first_failure["diagnostics"]}
-    assert "sai" in diagnostic_fields
-    assert diagnostic_fields & {"paai", "pc", "eea", "sca"}
-
-
-def test_report_summarizes_intermediate_diagnostics_for_red_gate(report):
-    assert report.diagnostic_summary == {
-        "sai": 1,
-        "parent_available_income": 1,
-        "parent_payroll_tax": 1,
-        "paai": 1,
-        "parent_total_allowances": 1,
-        "pc": 1,
-        "parents_negative_paai_allowance": 1,
-        "student_available_income": 1,
-        "student_total_allowances": 1,
-    }
+def test_report_has_no_failure_diagnostics_when_gate_is_green(report):
+    assert report.failures == []
+    assert report.diagnostic_summary == {}
+    assert report.diagnostic_summary_by_source == {}
+    assert report.failure_signature_summary == {}
 
 
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
         "no_parent_fti": {"total": 6, "passed": 6, "failed": 0, "skipped": 0},
-        "parent_fti": {"total": 36, "passed": 35, "failed": 1, "skipped": 0},
-    }
-    assert report.diagnostic_summary_by_source == {
-        "parent_fti": {
-            "sai": 1,
-            "paai": 1,
-            "parent_available_income": 1,
-            "parent_payroll_tax": 1,
-            "parent_total_allowances": 1,
-            "parents_negative_paai_allowance": 1,
-            "pc": 1,
-            "student_available_income": 1,
-            "student_total_allowances": 1,
-        },
-    }
-
-
-def test_report_summarizes_current_failure_signatures(report):
-    assert report.failure_signature_summary == {
-        "parent_fti:parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,parents_negative_paai_allowance,student_total_allowances,student_available_income,sai": 1,
+        "parent_fti": {"total": 36, "passed": 36, "failed": 0, "skipped": 0},
     }
 
 
@@ -207,45 +172,29 @@ def test_parent_fti_filing_status_controls_payroll_jointness():
     assert trace.sai == _pi(line, "sai")
 
 
-def test_remaining_parent_fti_failure_exposes_negative_paai_allowance_drift(report):
-    failure = next(
-        failure
-        for failure in report.failures
-        if failure["parent_input_source"] == "parent_fti"
+def test_parent_fti_self_reported_spouse_fields_override_spouse_fti_values():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == -921 and _pi(line, "p_spouse_manual_earned_income") == 8456
     )
-    diagnostics = {item["field"]: item for item in failure["diagnostics"]}
+    family = reconstruct_family(line)
+    trace = prove_sai(family)
+    trace_values = {step.label: int(step.value) for step in trace.steps}
 
-    assert failure["target"] == -921
-    assert diagnostics["parent_available_income"]["delta"] == -10732
-    assert diagnostics["parents_negative_paai_allowance"]["expected"] == 0
-    assert diagnostics["parents_negative_paai_allowance"]["actual"] == 8100
-    assert (
-        diagnostics["student_total_allowances"]["delta"]
-        == diagnostics["parents_negative_paai_allowance"]["delta"]
-    )
-
-
-def test_remaining_parent_fti_failure_includes_raw_fti_source_context(report):
-    failure = next(
-        failure
-        for failure in report.failures
-        if failure["parent_input_source"] == "parent_fti"
-    )
-
-    assert failure["parent_fti_source_context"] == {
-        "parent_filing_status_fti": 4,
-        "parent_agi_fti": 53025,
-        "parent_earned_fti": 49568,
-        "parent_tax_fti": 14589,
-        "parent_education_credits_fti": 2500,
-        "parent_untaxed_ira_distributions_fti": 30000,
-        "parent_spouse_filing_status_fti": 2,
-        "parent_spouse_agi_fti": 25689,
-        "parent_spouse_earned_fti": 25000,
-        "parent_spouse_tax_fti": 9568,
-        "parent_spouse_education_credits_fti": 0,
-        "parent_spouse_untaxed_ira_distributions_fti": 0,
-    }
+    assert _pi(line, "p_spouse_earned_fti") == 25000
+    assert _pi(line, "p_spouse_tax_fti") == 9568
+    assert _pi(line, "p_spouse_manual_earned_income") == 8456
+    assert _pi(line, "p_spouse_manual_tax") == 102
+    assert family.parent_income_tax_paid == 14589 + 102
+    assert family.parent_earned_income_p1 == 49568
+    assert family.parent_earned_income_p2 == 8456
+    assert trace_values["parent_payroll_tax"] == _pi(line, "parent_payroll_tax")
+    assert trace_values["parent_total_allowances"] == _pi(line, "parent_total_allowances")
+    assert trace_values["parent_available_income"] == _pi(line, "parent_available_income")
+    assert trace_values["parent_adjusted_available_income"] == _pi(line, "paai")
+    assert trace_values["parent_contribution"] == _pi(line, "pc")
+    assert trace.sai == -921
+    assert trace.sai == _pi(line, "sai")
 
 
 def test_student_reconstruction_uses_corrected_isir_offsets():
@@ -364,6 +313,20 @@ def test_no_parent_fti_records_now_pass_without_failure_diagnostics(report):
         "skipped": 0,
     }
     assert all(failure["parent_input_source"] != "no_parent_fti" for failure in report.failures)
+
+
+def test_self_reported_zero_replaces_populated_parent_spouse_fti_field():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == -921 and _pi(line, "p_spouse_tax_fti") == 9568
+    )
+    start, end = _FIELDS["p_spouse_manual_tax"]
+    line_with_zero_manual_tax = line[:start] + "0".ljust(end - start) + line[end:]
+
+    family = reconstruct_family(line_with_zero_manual_tax)
+
+    assert _pi(line_with_zero_manual_tax, "p_spouse_manual_tax") == 0
+    assert family.parent_income_tax_paid == _pi(line, "p_tax_fti")
 
 
 def test_intermediate_comparison_names_expected_isir_fields():

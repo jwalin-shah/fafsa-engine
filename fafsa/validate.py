@@ -112,13 +112,13 @@ def _get_isir_report() -> ISIRReport:
 def verify(trace: SAITrace) -> VerificationResult:
     """Report engine validation status for a computed trace.
 
-    The engine's components are validated against ED's published 2024-25 test
-    ISIRs (see fafsa/isir.py). This function reports that validation status
-    alongside the trace's SAI value.
+    The engine's final SAI outputs are checked against ED's published 2024-25
+    Formula A dependent test ISIRs (see fafsa/isir.py). This function reports
+    that validation status alongside the trace's SAI value.
 
     It does NOT claim that this specific input was independently verified
-    against ED — only that the engine producing the result has passed
-    component-level validation on ED's own test data.
+    against ED — only that the engine producing the result currently has final
+    SAI output agreement with ED's own Formula A dependent test records.
     """
     if trace.family is None:
         return VerificationResult(
@@ -146,8 +146,8 @@ def verify(trace: SAITrace) -> VerificationResult:
         message=(
             f"✅ engine validated against "
             f"{report.passed}/{report.dependent_records} Formula A "
-            f"dependent ED records (parent contribution schedule, "
-            f"SAI summation, IPA table). This specific input was computed "
-            f"by the same engine but was not independently checked against ED."
+            f"dependent ED records for final SAI output agreement. "
+            f"This specific input was computed by the same engine but was "
+            f"not independently checked against ED."
         ),
     )

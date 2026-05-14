@@ -678,3 +678,59 @@ Residual risk:
 
 - This does not change Formula A outputs and does not claim product correctness.
   It only makes the final blocker easier to review from official source fields.
+
+## FAFSA-Q Formula A Parent-Spouse Self-Reported Precedence - 2026-05-13
+
+Branch: `codex/fafsa-final-parent-spouse-manual-precedence`
+
+Scope: final source-field correction for the remaining Formula A parent-FTI
+failure.
+
+Evidence:
+
+- Official SAI guide Appendix H says self-reported income information at field
+  level replaces IRS FTI data at field level when both fields are populated.
+- The remaining line 100 record has parent-spouse self-reported earned income
+  `8456` and tax `102`, while the corresponding parent-spouse FTI fields are
+  earned income `25000` and tax `9568`.
+- Using parent FTI plus parent-spouse self-reported values yields ED's
+  intermediate values exactly:
+  - Parent income tax paid: `14589 + 102 = 14691`.
+  - Parent payroll tax: earned income `49568 + 8456 = 58024`, producing
+    Medicare `841` plus OASDI `3597`, total `4438`.
+  - Parent total allowances: `14691 + 4438 + 50060 + 4730 = 73919`.
+
+Change:
+
+- `fafsa/isir.py` now lets populated self-reported parent/spouse earned-income
+  and tax fields replace corresponding FTI fields before constructing
+  `DependentFamily`; population is checked with fixed-width field presence, not
+  value truthiness, so a self-reported zero can replace a populated FTI value.
+- `tests/test_isir_validation.py` now encodes the green Formula A baseline:
+  `42/42` pass, `0` fail, `all_passed=True`.
+- `tests/test_fafsa_kb.py` now expects `verify()` to report validated status
+  for the 42/42 Formula A gate.
+- README and `verify()` now scope the green claim to final SAI output agreement
+  for the official Formula A dependent-student test ISIR records.
+
+Validation:
+
+- `python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q`
+- `python3 -m pytest -q`
+- `git diff --check`
+- Explicit gate check: `validate_isir_file(...)`
+
+Results:
+
+- Focused FAFSA/ISIR validation: passed, `36 passed`.
+- Full suite: passed, `54 passed`.
+- Diff check: passed.
+- Explicit gate: `42/42` Formula A dependent records passed, `0` failed,
+  `0` skipped, `all_passed=True`.
+
+Residual risk:
+
+- The green claim is limited to bundled Formula A dependent-student ED test
+  records and final SAI output agreement. It does not validate all comparable
+  intermediates, all FAFSA forms, independent-student formulas, Pell
+  eligibility, LLM extraction quality, or arbitrary user inputs.

@@ -153,7 +153,6 @@ def reconstruct_family(line: str) -> DependentFamily:
     p_earned_income = _pi(line, "p_earned_fti")
     p_spouse_earned_income = _pi(line, "p_spouse_earned_fti")
     p_spouse_tax = _pi(line, "p_spouse_tax_fti")
-    p_tax += p_spouse_tax
     parent_fti_missing = (
         p_agi == 0
         and p_tax == 0
@@ -161,6 +160,16 @@ def reconstruct_family(line: str) -> DependentFamily:
         and p_spouse_earned_income == 0
         and p_spouse_tax == 0
     )
+
+    if _has_value(line, "p_manual_tax"):
+        p_tax = p_manual_tax
+    if _has_value(line, "p_spouse_manual_tax"):
+        p_spouse_tax = p_spouse_manual_tax
+    if _has_value(line, "p_manual_earned_income"):
+        p_earned_income = p_manual_earned_income
+    if _has_value(line, "p_spouse_manual_earned_income"):
+        p_spouse_earned_income = p_spouse_manual_earned_income
+    p_tax += p_spouse_tax
 
     p_total_income = _pi(line, "parent_total_income")
     if p_total_income:
@@ -171,14 +180,8 @@ def reconstruct_family(line: str) -> DependentFamily:
         p_ira = 0
 
     if parent_fti_missing:
-        if p_manual_tax or p_spouse_manual_tax:
-            p_tax = p_manual_tax + p_spouse_manual_tax
         if p_manual_filing_status:
             p_filing_status = p_manual_filing_status
-        if p_manual_earned_income:
-            p_earned_income = p_manual_earned_income
-        if p_spouse_manual_earned_income:
-            p_spouse_earned_income = p_spouse_manual_earned_income
 
     # Family structure
     family_size = _pi(line, "p_fam_fti")

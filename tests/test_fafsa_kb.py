@@ -98,15 +98,17 @@ def test_mfs_parent_payroll_tax_applies_caps_per_earner():
 from fafsa.validate import VerificationResult, make_family, verify
 
 
-def test_verify_reports_unverified_when_isir_validation_is_red():
-    """When local ED test ISIR validation is red, verify() must say so."""
+def test_verify_reports_verified_when_isir_validation_is_green():
+    """When local ED test ISIR validation is green, verify() must say so."""
     family = make_family(0)
     trace = prove_sai(family)
     result = verify(trace)
     assert isinstance(result, VerificationResult)
-    assert not result.verified
-    assert "FAILED ED validation" in result.message
-    assert "not trustworthy" in result.message
+    assert result.verified
+    assert "engine validated" in result.message
+    assert "final SAI output agreement" in result.message
+    assert "parent contribution schedule" not in result.message
+    assert "not independently checked against ED" in result.message
 
 
 def test_verify_message_mentions_current_isir_count():
@@ -114,7 +116,7 @@ def test_verify_message_mentions_current_isir_count():
     family = make_family(42)
     trace = prove_sai(family)
     result = verify(trace)
-    assert "41/42" in result.message
+    assert "42/42" in result.message
     assert "Formula A dependent ED records" in result.message
 
 
