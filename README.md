@@ -2,8 +2,9 @@
 
 An experimental FAFSA SAI proof engine with LLM-backed fact extraction.
 
-The current ED validation gate is red. Treat computed SAI values as
-experimental until the Formula A discrepancies below are fixed.
+The bundled ED Formula A validation gate is green for the official 2024-25
+dependent-student test ISIR records. Treat broader product claims as scoped to
+that validation set unless they have their own evidence.
 
 ```
 $ python demo.py "My parents make $80k, family of 4"
@@ -31,8 +32,9 @@ Query: My parents make $80k, family of 4
   contribution of around $8,000. Your SAI is 8,150.
 
 [4/4] Verifying...
-❌ engine FAILED ED validation: 41/42 Formula A dependent ED records pass,
-1 fail, 0 skipped (103 file lines scanned). Engine output is not trustworthy.
+✅ engine validated against 42/42 Formula A dependent ED records (parent
+final SAI output agreement). This specific input was computed by the same
+engine but was not independently checked against ED.
 ```
 
 ## Quick start
@@ -58,11 +60,11 @@ be reconciled before this is portable.
 - **Facts extracted** — the LLM reads your query and pulls out income, family size, and other variables
 - **Proof tree** — the engine computes every step deterministically, with a citation to the ED formula
 - **Narration** — the LLM explains the result in plain English
-- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local gate is currently red: 41 of 42 Formula A dependent records pass, 1 record fails, and 0 are skipped.
+- **Verification status** — the engine checks itself against the U.S. Department of Education's [official 2024-25 test ISIRs](https://github.com/usedgov/fafsa-test-isirs-2024-25). The bundled local Formula A gate is currently green: 42 of 42 dependent records pass, 0 fail, and 0 are skipped.
 
-The engine is the deterministic calculation layer. The LLM is the language layer. Because the current ED validation gate is red, treat computed results as experimental until the Formula A discrepancies are fixed.
+The engine is the deterministic calculation layer. The LLM is the language layer. The validation claim is limited to the bundled Formula A dependent-student ED test records.
 
-> **What "verified" means here:** `verify()` reports whether the local engine currently agrees with ED's published dependent-student test records. Today it returns unverified because the gate is red. When the gate is green, "verified" means component-level validation against ED's published test data; it still does *not* mean every input you provide has been individually checked against ED.
+> **What "verified" means here:** `verify()` reports whether the local engine's final SAI outputs currently agree with ED's published dependent-student test records. "Verified" means final-output validation against ED's published Formula A test data; it still does *not* mean every input you provide has been individually checked against ED or that every comparable intermediate field matches ED.
 
 ## Current ED validation status
 
@@ -72,40 +74,15 @@ Run:
 python3 -m pytest tests/test_isir_validation.py tests/test_fafsa_kb.py -q
 ```
 
-Current result: `38 passed`. These tests intentionally encode the red baseline
-so the public claim stays honest: `41/42` Formula A dependent ED records pass,
-`1/42` fails, and `0` are skipped.
+Current result: `36 passed`. These tests intentionally encode the green
+baseline so the public claim stays honest: `42/42` Formula A dependent ED
+records pass, `0/42` fail, and `0` are skipped.
 
-Failure taxonomy from the current gate:
-
-| Category | Count |
-|---|---:|
-| Engine SAI lower than ED target | 1 |
-| Engine SAI at `-1500` floor while ED target is higher | 1 |
-| Engine SAI higher than ED target | 0 |
-| Absolute delta within 1,000 | 1 |
-| Absolute delta from 1,001 to 10,000 | 0 |
-| Absolute delta from 10,001 to 50,000 | 0 |
-
-Aggregate mismatches across the 1 failing Formula A record are:
-
-| ISIR output field | Mismatching records |
-|---|---:|
-| Student Aid Index (`sai`) | 1/1 |
-| Parent payroll tax | 1/1 |
-| Parent total allowances | 1/1 |
-| Parent available income | 1/1 |
-| Parent adjusted available income (`paai`) | 1/1 |
-| Parent contribution (`pc`) | 1/1 |
-| Parents negative PAAI allowance | 1/1 |
-| Student available income | 1/1 |
-| Student total allowances | 1/1 |
-
-The current red baseline now separates records by parent input source:
+The current green baseline separates records by parent input source:
 
 | Parent input source | Total | Passed | Failed |
 |---|---:|---:|---:|
-| Parent FTI fields parsed | 36 | 35 | 1 |
+| Parent FTI fields parsed | 36 | 36 | 0 |
 | No parent FTI fields parsed | 6 | 6 | 0 |
 
 Records without parsed parent FTI values now use self-reported parent and
@@ -127,21 +104,19 @@ use generated student total income as Formula A line 22, avoid backfilling
 parent 1 wages from generated parent total income when spouse-only FTI earnings
 exist, round negative half-dollar values away from zero, and use parent FTIM
 filing status for payroll jointness when present.
-The remaining parent-FTI failure is
-`parent_payroll_tax,parent_total_allowances,parent_available_income,paai,pc,parents_negative_paai_allowance,student_total_allowances,student_available_income,sai`,
-one record. Failing records include a raw parent FTI source context block with
-separate parent and spouse/partner filing status, AGI, earned income, tax,
-education credits, and untaxed IRA distribution values so the remaining drift
-can be investigated from source fields rather than one-off parsing scripts.
 
-That spread points to formula and/or fixed-width reconstruction drift, so this
-slice does not claim ED validation is restored. Failing records now include
-field-level diagnostics for the comparable ED intermediates (`ipa`, `eea`,
-parent payroll tax, parent total allowances, parent available income, `paai`,
-`pc`, parents negative PAAI allowance, student total allowances, student
-available income, `sci`, `sca`, and `sai`), the parent input source, and
-aggregate summaries by source and failure signature. The next correction slice
-can target the single remaining parent FTI record.
+The final Formula A correction applies the official source-precedence rule that
+self-reported income information replaces IRS FTI at field level when both are
+populated. In the last parent-FTI record, parent-spouse self-reported earned
+income and tax replace the corresponding parent-spouse FTI fields for payroll
+and tax reconstruction, clearing the final SAI mismatch without back-solving
+from generated ED output fields.
+
+Failure records still include field-level diagnostics for comparable ED
+intermediates (`ipa`, `eea`, parent payroll tax, parent total allowances,
+parent available income, `paai`, `pc`, parents negative PAAI allowance, student
+total allowances, student available income, `sci`, `sca`, and `sai`), the
+parent input source, and aggregate summaries by source and failure signature.
 
 ## How it works
 
