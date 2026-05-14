@@ -103,6 +103,30 @@ class ISIRReport:
         )
 
 
+class ISIRParseError(ValueError):
+    """Raised when a nonblank fixed-width ISIR field cannot be parsed."""
+
+    def __init__(
+        self,
+        key: str,
+        value: str,
+        lineno: int | None,
+        start: int,
+        end: int,
+    ) -> None:
+        location = f"line {lineno}: " if lineno is not None else ""
+        message = (
+            f"{location}ISIR field {key!r} at columns {start + 1}-{end} "
+            f"must be an integer or blank, got {value!r}"
+        )
+        super().__init__(message)
+        self.key = key
+        self.value = value
+        self.lineno = lineno
+        self.start = start
+        self.end = end
+
+
 @dataclass(frozen=True)
 class ISIRRecord:
     """Parsed view over one fixed-width ISIR record."""
@@ -116,7 +140,7 @@ class ISIRRecord:
         try:
             return int(v[0])
         except ValueError:
-            return 0
+            raise ISIRParseError(key, v[0], self.lineno, s, e)
 
     def has_value(self, key: str) -> bool:
         s, e = _FIELDS[key]
@@ -416,20 +440,39 @@ def validate_isir_file(path: str | Path | None = None) -> ISIRReport:
             continue
 
         dependent_records += 1
-        target_sai = record.target_sai
-        parent_input_source = record.parent_input_source
-        source_counts = source_summary.setdefault(
-            parent_input_source,
-            {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
-        )
-        source_counts["total"] += 1
-        
-        # 1. Reconstruct inputs
         try:
+            target_sai = record.target_sai
+            parent_input_source = record.parent_input_source
+            source_counts = source_summary.setdefault(
+                parent_input_source,
+                {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
+            )
+            source_counts["total"] += 1
+
+            # 1. Reconstruct inputs
             family = record.reconstruct_family()
-        except Exception:
-            skipped += 1
-            source_counts["skipped"] += 1
+        except ISIRParseError as exc:
+            failed += 1
+            parent_input_source = "parse_error"
+            source_counts = source_summary.setdefault(
+                parent_input_source,
+                {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
+            )
+            source_counts["total"] += 1
+            source_counts["failed"] += 1
+            failures.append({
+                "lineno": lineno,
+                "target": None,
+                "actual": None,
+                "parent_input_source": parent_input_source,
+                "error": str(exc),
+                "field": exc.key,
+                "raw_value": exc.value,
+                "diagnostics": [],
+            })
+            failure_signature_summary[f"{parent_input_source}:{exc.key}"] = (
+                failure_signature_summary.get(f"{parent_input_source}:{exc.key}", 0) + 1
+            )
             continue
             
         # 2. Compute end-to-end

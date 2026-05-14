@@ -12,6 +12,7 @@ import pytest
 
 from fafsa.isir import (
     ISIRRecord,
+    ISIRParseError,
     ISIRReport,
     _FIELDS,
     _pi,
@@ -102,6 +103,49 @@ def test_isir_validator_fails_when_expected_sai_is_corrupted(tmp_path):
     assert corrupted_report.failed == 1
     assert corrupted_report.skipped == 0
     assert corrupted_report.failures[0]["diagnostics"][-1]["field"] == "sai"
+
+
+def test_isir_record_rejects_malformed_numeric_field():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if ISIRRecord(line).is_dependent_formula_a
+    )
+    malformed_line = _replace_field(line, "p_earned_fti", "12X45")
+
+    with pytest.raises(ISIRParseError) as excinfo:
+        ISIRRecord(malformed_line, lineno=7).field_int("p_earned_fti")
+
+    assert excinfo.value.key == "p_earned_fti"
+    assert excinfo.value.value == "12X45"
+    assert "line 7" in str(excinfo.value)
+    assert "must be an integer or blank" in str(excinfo.value)
+
+
+def test_isir_validator_rejects_malformed_numeric_input(tmp_path):
+    lines = ISIR_FILE.read_text().splitlines()
+    dependent_index, line = next(
+        (index, line) for index, line in enumerate(lines)
+        if ISIRRecord(line).is_dependent_formula_a
+    )
+    lines[dependent_index] = _replace_field(line, "p_earned_fti", "12X45")
+    malformed_file = tmp_path / "malformed-isir.txt"
+    malformed_file.write_text("\n".join(lines) + "\n")
+
+    malformed_report = validate_isir_file(malformed_file)
+
+    assert not malformed_report.all_passed
+    assert malformed_report.passed == 41
+    assert malformed_report.failed == 1
+    assert malformed_report.skipped == 0
+    assert malformed_report.source_summary["parse_error"] == {
+        "total": 1,
+        "passed": 0,
+        "failed": 1,
+        "skipped": 0,
+    }
+    assert malformed_report.failures[0]["field"] == "p_earned_fti"
+    assert malformed_report.failures[0]["raw_value"] == "12X45"
+    assert "must be an integer or blank" in malformed_report.failures[0]["error"]
 
 
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
