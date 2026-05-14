@@ -136,16 +136,23 @@ class ISIRRecord:
 
     @property
     def parent_input_source(self) -> str:
-        if (
-            self.field_int("p_agi_fti")
-            or self.field_int("p_earned_fti")
-            or self.field_int("p_tax_fti")
-            or self.field_int("p_ira_fti")
-            or self.field_int("p_spouse_earned_fti")
-            or self.field_int("p_spouse_tax_fti")
-        ):
+        if self.has_parent_fti_income_or_tax_source:
             return "parent_fti"
         return "no_parent_fti"
+
+    @property
+    def has_parent_fti_income_or_tax_source(self) -> bool:
+        return any(
+            self.field_int(key)
+            for key in (
+                "p_agi_fti",
+                "p_earned_fti",
+                "p_tax_fti",
+                "p_ira_fti",
+                "p_spouse_earned_fti",
+                "p_spouse_tax_fti",
+            )
+        )
 
     def reconstruct_family(self) -> DependentFamily:
         return _reconstruct_family(self)
@@ -229,13 +236,7 @@ def _reconstruct_family(record: ISIRRecord) -> DependentFamily:
     p_earned_income = record.field_int("p_earned_fti")
     p_spouse_earned_income = record.field_int("p_spouse_earned_fti")
     p_spouse_tax = record.field_int("p_spouse_tax_fti")
-    parent_fti_missing = (
-        p_agi == 0
-        and p_tax == 0
-        and p_ira == 0
-        and p_spouse_earned_income == 0
-        and p_spouse_tax == 0
-    )
+    parent_fti_missing = not record.has_parent_fti_income_or_tax_source
 
     if record.has_manual_override("p_manual_agi") or record.has_manual_override("p_spouse_manual_agi"):
         p_agi = (

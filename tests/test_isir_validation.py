@@ -166,6 +166,32 @@ def test_parent_fti_layout_distinguishes_agi_from_earned_income():
     assert family.parent_earned_income_p1 == _pi(line, "p_earned_fti")
 
 
+def test_parent_fti_source_rule_is_shared_by_classification_and_reconstruction():
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if ISIRRecord(line).is_dependent_formula_a
+    )
+    for key in (
+        "p_agi_fti",
+        "p_tax_fti",
+        "p_ira_fti",
+        "p_spouse_earned_fti",
+        "p_spouse_tax_fti",
+        "p_filing_status_fti",
+    ):
+        line = _replace_field(line, key, "")
+    line = _replace_field(line, "p_earned_fti", "12345")
+    line = _replace_field(line, "p_manual_filing_status", "3")
+
+    record = ISIRRecord(line)
+    family = record.reconstruct_family()
+
+    assert record.has_parent_fti_income_or_tax_source
+    assert record.parent_input_source == "parent_fti"
+    assert family.parent_earned_income_p1 == 12345
+    assert family.parent_filing_status == 0
+
+
 def test_parent_fti_reconstruction_includes_spouse_earnings_and_tax():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
