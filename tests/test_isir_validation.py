@@ -221,6 +221,38 @@ def test_parent_fti_self_reported_spouse_fields_override_spouse_fti_values():
     assert trace.sai == _pi(line, "sai")
 
 
+def test_public_validation_fails_without_parent_spouse_self_reported_override(tmp_path):
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if _pi(line, "sai") == -921 and _pi(line, "p_spouse_manual_earned_income") == 8456
+    )
+    single_record_file = tmp_path / "single-isir.txt"
+    single_record_file.write_text(line + "\n")
+
+    original_report = validate_isir_file(single_record_file)
+
+    assert original_report.all_passed
+    assert original_report.passed == 1
+
+    mutated_line = _replace_field(line, "p_spouse_manual_earned_income", "")
+    mutated_line = _replace_field(mutated_line, "p_spouse_manual_tax", "")
+    mutated_file = tmp_path / "missing-spouse-manual-override-isir.txt"
+    mutated_file.write_text(mutated_line + "\n")
+
+    mutated_report = validate_isir_file(mutated_file)
+
+    assert not mutated_report.all_passed
+    assert mutated_report.passed == 0
+    assert mutated_report.failed == 1
+    assert mutated_report.failures[0]["target"] == -921
+    assert mutated_report.failures[0]["actual"] == -1500
+    assert mutated_report.failures[0]["parent_input_source"] == "parent_fti"
+    assert mutated_report.failures[0]["parent_earned_income_p2"] == 25000
+    assert mutated_report.failures[0]["p_tax"] == 24157
+    assert mutated_report.diagnostic_summary["sai"] == 1
+    assert mutated_report.diagnostic_summary["parent_payroll_tax"] == 1
+
+
 def test_parent_self_reported_agi_overrides_parent_fti_agi_without_total_income_proxy():
     line = next(
         line for line in ISIR_FILE.read_text().splitlines()
