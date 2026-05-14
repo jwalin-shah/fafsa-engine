@@ -766,3 +766,46 @@ Residual risk:
   records and final SAI output agreement. It does not validate all comparable
   intermediates, all FAFSA forms, independent-student formulas, Pell
   eligibility, LLM extraction quality, or arbitrary user inputs.
+
+## WP-142 CLI Smoke Contract - 2026-05-14
+
+Branch: `codex/WP-142-cli-smoke-contract`
+
+Scope: add a no-secret smoke path to the existing `demo.py` CLI entrypoint and
+lock its success/failure behavior in local tests.
+
+Change:
+
+- `demo.py` now uses `argparse` through a testable `main()` function.
+- `python3 demo.py --smoke` runs a deterministic FAFSA engine check without
+  selecting an LLM backend, calling external services, or requiring secrets.
+- Missing query input now fails nonzero through argparse with the clear message
+  `query is required unless --smoke is used`.
+- `tests/test_cli_smoke.py` covers the successful smoke path and bad-input
+  failure path through subprocess execution.
+
+Validation:
+
+```bash
+python3 -m pytest tests/test_cli_smoke.py -q
+```
+
+Result: passed, `2 passed`.
+
+```bash
+python3 -m pytest -q
+```
+
+Result: passed, `61 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
+Residual risk:
+
+- The smoke contract proves CLI imports, argument parsing, deterministic engine
+  execution, and validation failure reporting. It intentionally does not prove
+  live LLM extraction, interactive confirmation, or hosted provider behavior.

@@ -6,12 +6,42 @@ Usage:
     FAFSA_LLM=claude <set ANTHROPIC_API_KEY> python demo.py "..."
     FAFSA_LLM=openai <set OPENAI_API_KEY> python demo.py "..."
 """
+import argparse
 import sys
 from dataclasses import fields
 
 from fafsa.kb import DependentFamily, fmt_trace, prove_sai
 from fafsa.validate import verify
 from llm.base import get_backend
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="demo.py",
+        description="Run the FAFSA SAI demo pipeline.",
+    )
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="run a deterministic no-LLM smoke check and exit",
+    )
+    parser.add_argument(
+        "query",
+        nargs="*",
+        help="natural-language FAFSA family description",
+    )
+    return parser
+
+
+def run_smoke() -> int:
+    family = DependentFamily(parent_agi=80_000, family_size=4)
+    trace = prove_sai(family)
+    result = verify(trace)
+
+    print("FAFSA CLI smoke: ok")
+    print(f"SAI: {trace.sai}")
+    print(result.message)
+    return 0 if result.verified else 1
 
 
 def run(query: str) -> None:
@@ -80,8 +110,19 @@ def run(query: str) -> None:
     print()
 
 
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.smoke:
+        return run_smoke()
+
+    if not args.query:
+        parser.error("query is required unless --smoke is used")
+
+    run(" ".join(args.query))
+    return 0
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print('Usage: python demo.py "My parents make $80k, family of 4"')
-        sys.exit(1)
-    run(" ".join(sys.argv[1:]))
+    sys.exit(main())
