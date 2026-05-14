@@ -8,11 +8,10 @@ dependent records the engine agrees with. A failed local gate means the trace
 is unverified.
 """
 from __future__ import annotations
-import math
 import random
 from dataclasses import dataclass, asdict
 
-from fafsa.kb import DependentFamily, SAITrace, prove_sai
+from fafsa.kb import DependentFamily, SAITrace, _ed_round, prove_sai
 from fafsa.isir import validate_isir_file, ISIRReport
 
 
@@ -20,12 +19,6 @@ from fafsa.isir import validate_isir_file, ISIRReport
 class VerificationResult:
     verified: bool
     message: str
-
-
-def _ed_round_local(x: float) -> int:
-    if x < 0:
-        return math.ceil(x - 0.5)
-    return math.floor(x + 0.5)
 
 
 def _rand_int(lo: int, hi: int, zero_prob: float = 0.0) -> int:
@@ -50,7 +43,7 @@ def make_family(seed: int | None = None) -> DependentFamily:
 
     parent_agi = _rand_int(0, 300_000)
     eff_rate = random.uniform(0.05, 0.25)
-    parent_tax = _ed_round_local(parent_agi * eff_rate)
+    parent_tax = _ed_round(parent_agi * eff_rate)
 
     p1_wages = _rand_int(0, parent_agi, zero_prob=0.05)
     p2_wages = _rand_int(0, max(0, parent_agi - p1_wages), zero_prob=0.3) if num_parents == 2 else 0
@@ -66,7 +59,7 @@ def make_family(seed: int | None = None) -> DependentFamily:
 
     s_agi = _rand_int(0, 30_000, zero_prob=0.3)
     s_wages = _rand_int(0, s_agi, zero_prob=0.1)
-    s_tax = _ed_round_local(s_agi * random.uniform(0.0, 0.15))
+    s_tax = _ed_round(s_agi * random.uniform(0.0, 0.15))
 
     s_cash = _rand_int(0, 20_000, zero_prob=0.5)
     s_inv = _rand_int(0, 30_000, zero_prob=0.8)

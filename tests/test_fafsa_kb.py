@@ -1,4 +1,6 @@
 import pytest
+import fafsa.kb as kb
+import fafsa.validate as validate_module
 from fafsa.kb import DependentFamily, SAITrace, CitedValue, _ed_round, _medicare, _parent_payroll_tax, prove_sai, prove_sai_counterfactual, fmt_trace
 
 
@@ -56,6 +58,11 @@ def test_steps_are_cited_values():
 def test_ed_round_halves_away_from_zero():
     assert _ed_round(1174.5) == 1175
     assert _ed_round(-1174.5) == -1175
+
+
+def test_validation_family_generation_uses_canonical_ed_rounding():
+    assert validate_module._ed_round is kb._ed_round
+    assert not hasattr(validate_module, "_ed_round_local")
 
 
 def test_parent_payroll_jointness_falls_back_to_num_parents_without_filing_status():
