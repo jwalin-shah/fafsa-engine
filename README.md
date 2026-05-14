@@ -88,6 +88,11 @@ The current green baseline separates records by parent input source:
 | Parent FTI fields parsed | 36 | 36 | 0 |
 | No parent FTI fields parsed | 6 | 6 | 0 |
 
+The ED ISIR file under `data/` is a tracked validation fixture, not a runtime
+output directory. Generated validation logs, local run manifests, tool caches,
+and scratch outputs should stay in ignored local paths such as `.local/`,
+`runs/`, `outputs/`, `artifacts/`, or `logs/`.
+
 Records without parsed parent FTI values now use self-reported parent and
 spouse manual source fields from the official 2024-25 ISIR layout for income
 earned from work, income tax paid, and filing status. The relevant source

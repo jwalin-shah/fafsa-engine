@@ -19,3 +19,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["fafsa", "llm"]
+
+[tool.pytest.ini_options]
+cache_dir = ".local/pytest-cache"

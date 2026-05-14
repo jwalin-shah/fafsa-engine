@@ -1,5 +1,38 @@
 # FAFSA Engine Workpad
 
+## WP-170 Fixture Runtime Separation - 2026-05-14
+
+Branch: `codex/WP-170-fixture-runtime-separation`
+
+Scope: keep tracked validation fixtures separate from local runtime outputs,
+tool caches, and generated run evidence.
+
+Change:
+
+- `.gitignore` now ignores repo-local runtime and validation output paths:
+  `.local/`, `.pytest_cache/`, `.uv-cache/`, `.tldr/`, `.rtk/`, `runs/`,
+  `outputs/`, `artifacts/`, `logs/`, and `*.log`.
+- `pyproject.toml` sets pytest's cache directory to `.local/pytest-cache`, so
+  the default validation command writes cache state to an ignored local path.
+- `data/README.md` documents that the bundled ED ISIR file is a deterministic
+  tracked fixture and that generated outputs do not belong under `data/`.
+- `tests/test_runtime_output_defaults.py` asserts the ignored output defaults
+  and that the default ISIR validation path remains the tracked fixture.
+
+Validation:
+
+```bash
+python3 -m pytest -q
+```
+
+Result: passed, `64 passed`.
+
+```bash
+git diff --check
+```
+
+Result: passed.
+
 ## WP-086 Shallow Module Deepening - 2026-05-14
 
 Branch: `codex/WP-086-shallow-module-deepening`
