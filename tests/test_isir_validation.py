@@ -148,6 +148,58 @@ def test_isir_validator_rejects_malformed_numeric_input(tmp_path):
     assert "must be an integer or blank" in malformed_report.failures[0]["error"]
 
 
+def test_isir_validator_does_not_double_count_parse_failure_source(tmp_path):
+    lines = ISIR_FILE.read_text().splitlines()
+    dependent_index, line = next(
+        (index, line) for index, line in enumerate(lines)
+        if ISIRRecord(line).is_dependent_formula_a and ISIRRecord(line).parent_input_source == "parent_fti"
+    )
+    lines[dependent_index] = _replace_field(line, "p_manual_agi", "12X45")
+    malformed_file = tmp_path / "malformed-manual-agi-isir.txt"
+    malformed_file.write_text("\n".join(lines) + "\n")
+
+    malformed_report = validate_isir_file(malformed_file)
+
+    assert malformed_report.dependent_records == 42
+    assert sum(bucket["total"] for bucket in malformed_report.source_summary.values()) == 42
+    assert malformed_report.source_summary["parent_fti"] == {
+        "total": 35,
+        "passed": 35,
+        "failed": 0,
+        "skipped": 0,
+    }
+    assert malformed_report.source_summary["parse_error"] == {
+        "total": 1,
+        "passed": 0,
+        "failed": 1,
+        "skipped": 0,
+    }
+    assert malformed_report.failures[0]["field"] == "p_manual_agi"
+
+
+def test_isir_validator_catches_diagnostic_parse_failure(tmp_path):
+    line = next(
+        line for line in ISIR_FILE.read_text().splitlines()
+        if ISIRRecord(line).is_dependent_formula_a
+    )
+    line = _replace_field(line, "sai", str(_pi(line, "sai") + 1))
+    line = _replace_field(line, "paai", "12X45")
+    malformed_file = tmp_path / "malformed-diagnostic-isir.txt"
+    malformed_file.write_text(line + "\n")
+
+    malformed_report = validate_isir_file(malformed_file)
+
+    assert not malformed_report.all_passed
+    assert malformed_report.dependent_records == 1
+    assert malformed_report.passed == 0
+    assert malformed_report.failed == 1
+    assert malformed_report.source_summary == {
+        "parse_error": {"total": 1, "passed": 0, "failed": 1, "skipped": 0},
+    }
+    assert malformed_report.failures[0]["field"] == "paai"
+    assert malformed_report.failures[0]["raw_value"] == "12X45"
+
+
 def test_report_summarizes_current_baseline_by_parent_input_source(report):
     assert report.source_summary == {
         "no_parent_fti": {"total": 6, "passed": 6, "failed": 0, "skipped": 0},
